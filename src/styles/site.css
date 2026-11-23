@@ -1,0 +1,255 @@
+:root {
+	--fog: #a3a8b6;
+	--fog-light: #c9ced8;
+	--slate: #5a6170;
+	--graphite: #1b2230;
+	--ice: #f4f7fb;
+	--edge: clamp(20px, 3.5vw, 56px);
+	--display: 'Geist Variable', system-ui, sans-serif;
+	--mono: 'Geist Mono Variable', ui-monospace, monospace;
+	--step--1: 0.75rem;
+	--step-0: 0.8125rem;
+	--step-1: 1rem;
+	--step-2: 1.25rem;
+	color-scheme: light;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: var(--fog);
+	color: var(--ice);
+	font-family: var(--display);
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+.site {
+	position: relative;
+	min-height: 100dvh;
+	overflow: hidden;
+}
+
+.scene {
+	position: fixed;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	display: block;
+	opacity: 0;
+	transition: opacity 0.9s ease;
+}
+
+[data-phase='entering'] .scene,
+[data-phase='ready'] .scene {
+	opacity: 1;
+}
+
+/* without WebGL the same text sits on an image of the real scene */
+[data-webgl='unavailable'] .site,
+[data-webgl='lost'] .site {
+	background: var(--fog) center / cover no-repeat url('/fallback/hero-desktop.jpg');
+}
+
+@media (max-aspect-ratio: 4/5) {
+	[data-webgl='unavailable'] .site,
+	[data-webgl='lost'] .site {
+		background-image: url('/fallback/hero-phone.jpg');
+	}
+}
+
+.mast,
+.intro,
+.hint {
+	position: fixed;
+	z-index: 2;
+	text-shadow: 0 0 18px rgb(27 34 48 / 0.28), 0 1px 2px rgb(27 34 48 / 0.3);
+	transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.mast {
+	top: calc(var(--edge) + env(safe-area-inset-top));
+	left: calc(var(--edge) + env(safe-area-inset-left));
+}
+
+.wordmark {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.6rem;
+	color: inherit;
+	text-decoration: none;
+	font-size: var(--step-2);
+	font-weight: 600;
+	letter-spacing: -0.015em;
+	line-height: 1;
+}
+
+.wordmark svg {
+	width: 2.1rem;
+	height: auto;
+	fill: currentColor;
+}
+
+.wordmark-seam {
+	fill: #fff;
+	filter: drop-shadow(0 0 3px #fff);
+}
+
+.label {
+	font-family: var(--mono);
+	font-size: var(--step--1);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	line-height: 1.45;
+	margin: 0;
+}
+
+.identity {
+	margin-top: 0.9rem;
+	opacity: 0.82;
+}
+
+.intro {
+	top: calc(var(--edge) + env(safe-area-inset-top));
+	right: calc(var(--edge) + env(safe-area-inset-right));
+	width: min(19rem, 42vw);
+	text-align: right;
+}
+
+.intro-tag {
+	opacity: 0.7;
+	margin-bottom: 0.9rem;
+}
+
+.intro h1 {
+	margin: 0;
+	font-size: var(--step-2);
+	font-weight: 500;
+	letter-spacing: -0.012em;
+	line-height: 1.25;
+	text-wrap: balance;
+}
+
+.supporting {
+	margin: 0.8rem 0 0;
+	font-family: var(--mono);
+	font-size: var(--step-0);
+	line-height: 1.55;
+	opacity: 0.86;
+	text-wrap: pretty;
+}
+
+.hint {
+	left: calc(var(--edge) + env(safe-area-inset-left));
+	bottom: calc(var(--edge) + env(safe-area-inset-bottom));
+	opacity: 0.85;
+}
+
+.hint::before {
+	content: '';
+	display: inline-block;
+	width: 1.6rem;
+	height: 1px;
+	margin-right: 0.7rem;
+	vertical-align: middle;
+	background: currentColor;
+}
+
+/* text is readable from first paint, then yields to the entrance and returns when the camera rests */
+[data-phase='entering'] .intro,
+[data-phase='entering'] .hint,
+[data-phase='entering'] .identity {
+	opacity: 0;
+	transform: translateY(6px);
+}
+
+[data-phase='loading'] .mast,
+[data-phase='loading'] .intro,
+[data-phase='loading'] .hint {
+	color: var(--graphite);
+	text-shadow: none;
+}
+
+.loader {
+	position: fixed;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	pointer-events: none;
+	color: var(--graphite);
+	opacity: 0;
+	transition: opacity 0.4s ease;
+}
+
+[data-phase='loading'] .loader {
+	opacity: 0.8;
+}
+
+.loader-glyphs::before {
+	content: '··········';
+	letter-spacing: 0.3em;
+	animation: glyphs 1.1s steps(1) infinite;
+}
+
+@keyframes glyphs {
+	0% { content: '+·········'; }
+	20% { content: '·+×·······'; }
+	40% { content: '···+×·····'; }
+	60% { content: '·····+×···'; }
+	80% { content: '·······+×·'; }
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+a:focus-visible {
+	outline: 2px solid var(--ice);
+	outline-offset: 6px;
+	border-radius: 2px;
+}
+
+@media (max-width: 640px) {
+	.intro {
+		top: calc(var(--edge) + env(safe-area-inset-top) + 4.4rem);
+		left: var(--edge);
+		right: var(--edge);
+		width: auto;
+		max-width: 21rem;
+		text-align: left;
+	}
+
+	.intro-tag {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.scene,
+	.mast,
+	.intro,
+	.hint {
+		transition: none;
+	}
+
+	.loader-glyphs::before {
+		animation: none;
+	}
+}
+
+/* ?still holds one deterministic frame for captures */
+[data-still] *,
+[data-still] *::before {
+	transition: none !important;
+	animation: none !important;
+}
