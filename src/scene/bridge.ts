@@ -31,16 +31,25 @@ export interface BlockRig {
 	introAngle: number;
 	loosen: number;
 	twistAxis: THREE.Vector3;
+	/** How much this block parts when the camera passes through the seam. Only the arm tips move. */
+	gate: number;
 }
 
 const MOBILITY: Record<BlockExtras['kind'], number> = { plinth: 0, pier: 0.25, table: 0.5, front: 1, back: 0.8 };
 
 export class Bridge {
 	readonly root = new THREE.Group();
+	/**
+	 * Lights live outside the group that gets hidden. The number of lights in the scene must never
+	 * change, or every lit shader recompiles the first time a chapter appears.
+	 */
+	readonly lights = new THREE.Group();
 	readonly blocks: BlockRig[] = [];
 	readonly seamPosition = new THREE.Vector3();
 	/** 0 is dark, 1 is the resting brightness. The entrance and the pointer both drive it. */
 	seamLevel = 0;
+	/** 0 closed, 1 parted. Set from scroll progress: the arm tips open for the camera. */
+	gate = 0;
 	private seamBoost = 0;
 	private core!: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>;
 	private halo!: THREE.Sprite;
@@ -83,6 +92,7 @@ export class Bridge {
 				introAngle: (seed(i + 19) - 0.5) * 1.1,
 				loosen: 0,
 				twistAxis: new THREE.Vector3(seed(i + 23) - 0.5, seed(i + 29) - 0.5, seed(i + 31) - 0.5).normalize(),
+				gate: extras.kind === 'front' ? THREE.MathUtils.smoothstep(4.2 - Math.abs(home.x), 0.4, 3.9) : 0,
 			});
 			this.root.add(group, lines);
 		}
@@ -108,14 +118,21 @@ export class Bridge {
 		this.pool = new THREE.PointLight(look.seam.color, 0, 11, 2);
 		this.pool.position.set(0, 3, 0.6);
 		this.touch = new THREE.PointLight(look.seam.color, 0, 7, 2);
-		this.root.add(this.core, this.halo, this.light, this.pool, this.touch);
+		this.root.add(this.core, this.halo);
+		this.lights.add(this.light, this.pool, this.touch);
 	}
 
-	/** Advances block poses. `ray` is the pointer ray in world space, or null when the pointer is away. */
-	update(dt: number, ray: THREE.Ray | null, time: number): void {
+	private lastMotion = -1;
+
+	/**
+	 * Advances block poses. `ray` is the pointer ray in world space, or null when the pointer is away.
+	 * Returns whether any block moved enough to change its shadow.
+	 */
+	update(dt: number, ray: THREE.Ray | null, time: number): boolean {
 		const k = 1 - Math.exp(-dt * look.pointer.stiffness);
 		let maxLoosen = 0;
 		let nearSeam = 0;
+		let motion = this.gate;
 		for (const b of this.blocks) {
 			let target = 0;
 			if (ray && b.build > 0.999) {
@@ -124,8 +141,11 @@ export class Bridge {
 			}
 			b.loosen += (target - b.loosen) * k;
 			maxLoosen = Math.max(maxLoosen, b.loosen);
+			motion += b.loosen + b.build;
 			const settle = 1 - b.build;
 			this.tmp.copy(b.introOffset).multiplyScalar(settle).addScaledVector(b.out, b.loosen * look.pointer.travel);
+			this.tmp.x += b.side * this.gate * b.gate * 1.5;
+			this.tmp.y += this.gate * b.gate * 0.35;
 			// a slow breath so the assembled bridge is never frozen
 			this.tmp.y += Math.sin(time * 0.5 + b.order * 0.9 + b.side) * 0.004 * b.mobility;
 			b.group.position.copy(b.home).add(this.tmp);
@@ -142,13 +162,22 @@ export class Bridge {
 		}
 		this.seamBoost += (nearSeam - this.seamBoost) * k;
 		stoneUniforms.uLoosen.value = maxLoosen;
-		const level = this.seamLevel * (1 + 0.55 * this.seamBoost) * (0.97 + 0.03 * Math.sin(time * 1.7));
+		const level = this.seamLevel * (1 + 0.55 * this.seamBoost + 0.8 * this.gate) * (0.97 + 0.03 * Math.sin(time * 1.7));
 		this.core.material.color.set(look.seam.color).multiplyScalar(look.seam.core * level);
 		this.core.visible = level > 0.01;
+		this.core.scale.set(1 + this.gate * 4, 1, 1);
 		this.halo.material.opacity = look.seam.halo * Math.min(level, 1.6);
 		this.light.intensity = look.seam.light * level;
 		this.pool.intensity = look.seam.pool * level;
 		this.touch.intensity = 26 * maxLoosen * this.seamLevel;
+		const moved = Math.abs(motion - this.lastMotion) > 1e-4;
+		this.lastMotion = motion;
+		return moved;
+	}
+
+	/** Called while the lab is hidden. */
+	dark(): void {
+		this.light.intensity = this.pool.intensity = this.touch.intensity = 0;
 	}
 
 	dispose(): void {

@@ -2,3 +2,6 @@ node_modules/
 dist/
 # Third-party imagery of igloo.inc. Regenerate with reference/igloo/scripts/.
 reference/igloo/captures/
+
+# Journey recordings are large. Regenerate with tools/record.mjs.
+docs/journey/*.webm

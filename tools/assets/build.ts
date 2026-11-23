@@ -2,8 +2,9 @@
 // Run with: pnpm assets:build
 import { mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { BLOCKS, type Block, SEAM, sdBlock, sdBlockCoarse, sdBridgeCoarse } from './bridge.ts';
+import { SHAPES, type Shape } from './exhibits.ts';
 import { type BakedMesh, writeGlb } from './glb.ts';
-import { clamp, makeNoise, smooth } from './noise.ts';
+import { clamp, makeNoise, mulberry32, smooth } from './noise.ts';
 import { encodeGrayPng } from './png.ts';
 import { type Sdf, surfaceNets, type Vec3 } from './surfacenets.ts';
 import { terrain, terrainHeight, terrainNoise } from './terrain-fn.ts';
@@ -63,6 +64,41 @@ function bakeBlock(b: Block): BakedMesh {
 	}
 	const idx = new Uint32Array(indices);
 	// surface nets does not guarantee winding, so orient every triangle by the field normal
+	orient(idx, pos, normals);
+	return {
+		name: b.name, positions: pos, normals, bake, indices: idx,
+		extras: { side: b.side, kind: b.kind, order: b.order, pivot: b.pivot, out: b.out, poly: b.poly.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]), z0: +b.min[2].toFixed(3), z1: +b.max[2].toFixed(3) },
+	};
+}
+
+// Exhibit shapes use the bridge channels, so they share its material. R and G both hold occlusion.
+function bakeShape(shape: Shape): BakedMesh {
+	const { positions, indices } = surfaceNets(shape.fine, shape.min, shape.max, shape.cell);
+	const count = positions.length / 3;
+	const pos = new Float32Array(positions);
+	const normals = new Float32Array(count * 3);
+	const bake = new Uint8Array(count * 4);
+	const f = shape.fine;
+	const g = shape.coarse;
+	for (let i = 0; i < count; i++) {
+		let p: Vec3 = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
+		let n = gradient(f, p[0], p[1], p[2], 0.008);
+		const d = f(p[0], p[1], p[2]);
+		p = [p[0] - n[0] * d, p[1] - n[1] * d, p[2] - n[2] * d];
+		n = gradient(f, p[0], p[1], p[2], 0.008);
+		pos.set(p, i * 3);
+		normals.set(n, i * 3);
+		const e = 0.05;
+		const lap = (g(p[0] + e, p[1], p[2]) + g(p[0] - e, p[1], p[2]) + g(p[0], p[1] + e, p[2]) + g(p[0], p[1] - e, p[2]) + g(p[0], p[1], p[2] + e) + g(p[0], p[1], p[2] - e) - 6 * g(p[0], p[1], p[2])) / e;
+		const ao = occlusion(g, p, n, 0.4);
+		bake.set([byte(ao), byte(ao), byte(0.5 + lap * 0.55), 128], i * 4);
+	}
+	const idx = new Uint32Array(indices);
+	orient(idx, pos, normals);
+	return { name: shape.name, positions: pos, normals, bake, indices: idx };
+}
+
+function orient(idx: Uint32Array, pos: Float32Array, normals: Float32Array): void {
 	for (let t = 0; t < idx.length; t += 3) {
 		const [a, c, d] = [idx[t] * 3, idx[t + 1] * 3, idx[t + 2] * 3];
 		const ux = pos[c] - pos[a], uy = pos[c + 1] - pos[a + 1], uz = pos[c + 2] - pos[a + 2];
@@ -70,10 +106,42 @@ function bakeBlock(b: Block): BakedMesh {
 		const dot = (uy * vz - uz * vy) * normals[a] + (uz * vx - ux * vz) * normals[a + 1] + (ux * vy - uy * vx) * normals[a + 2];
 		if (dot < 0) [idx[t + 1], idx[t + 2]] = [idx[t + 2], idx[t + 1]];
 	}
-	return {
-		name: b.name, positions: pos, normals, bake, indices: idx,
-		extras: { side: b.side, kind: b.kind, order: b.order, pivot: b.pivot, out: b.out, poly: b.poly.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]), z0: +b.min[2].toFixed(3), z1: +b.max[2].toFixed(3) },
-	};
+}
+
+/** Points spread evenly over the surface of some meshes, moved and scaled into the particle volume. */
+function samplePoints(meshes: BakedMesh[], count: number, seed: number, center: Vec3, scale: number, keep: (y: number) => boolean = () => true): Float32Array {
+	const rand = mulberry32(seed);
+	const tris: { m: BakedMesh; t: number; area: number }[] = [];
+	let total = 0;
+	for (const m of meshes)
+		for (let t = 0; t < m.indices.length; t += 3) {
+			const [a, b, c] = [m.indices[t] * 3, m.indices[t + 1] * 3, m.indices[t + 2] * 3];
+			const p = m.positions;
+			if (!keep((p[a + 1] + p[b + 1] + p[c + 1]) / 3)) continue;
+			const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2];
+			const vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
+			const area = 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+			total += area;
+			tris.push({ m, t, area: total });
+		}
+	const out = new Float32Array(count * 3);
+	for (let i = 0; i < count; i++) {
+		const r = rand() * total;
+		let lo = 0;
+		let hi = tris.length - 1;
+		while (lo < hi) {
+			const mid = (lo + hi) >> 1;
+			if (tris[mid].area < r) lo = mid + 1;
+			else hi = mid;
+		}
+		const { m, t } = tris[lo];
+		const [a, b, c] = [m.indices[t] * 3, m.indices[t + 1] * 3, m.indices[t + 2] * 3];
+		let u = rand();
+		let v = rand();
+		if (u + v > 1) [u, v] = [1 - u, 1 - v];
+		for (let k = 0; k < 3; k++) out[i * 3 + k] = (m.positions[a + k] + u * (m.positions[b + k] - m.positions[a + k]) + v * (m.positions[c + k] - m.positions[a + k]) - center[k]) * scale;
+	}
+	return out;
 }
 
 // Terrain bake channels: R occlusion from the bridge, G snow cover, B cavity (0.5 is flat), A broad tint.
@@ -148,6 +216,22 @@ await writeGlb(`${OUT}/terrain.glb`, [
 	bakeTerrain('far', -264, 264, -304, 76, 2.4, [near[0] + 3, near[1] - 3, near[2] + 3, near[3] - 3], false),
 ]);
 writeFileSync(`${OUT}/stone-detail.png`, detailTexture(512));
+const shapes = SHAPES.map(bakeShape);
+await writeGlb(`${OUT}/exhibits.glb`, shapes);
+
+// Particle targets for the final installation: 3 forms of PARTICLES points, 16-bit, in a volume of +-3.
+const PARTICLES = 24000;
+const shape = (name: string) => shapes.filter((m) => m.name === name);
+const forms = [
+	samplePoints(blocks, PARTICLES, 5, [0, 2.9, 0], 0.27, (y) => y > 0.1),
+	samplePoints(shape('engineering'), PARTICLES, 6, [0, -0.15, 0], 1.0),
+	samplePoints(shape('kensaku'), PARTICLES, 7, [0, -0.35, -0.2], 0.95),
+];
+const packed = new Int16Array(PARTICLES * 9);
+forms.forEach((f, k) => {
+	for (let i = 0; i < f.length; i++) packed[k * PARTICLES * 3 + i] = Math.round(clamp(f[i] / 3, -1, 1) * 32767);
+});
+writeFileSync(`${OUT}/particles.bin`, Buffer.from(packed.buffer));
 
 const tris = (m: BakedMesh[]) => m.reduce((s, x) => s + x.indices.length / 3, 0);
 const report = {
@@ -156,6 +240,9 @@ const report = {
 	bridgeBytes: statSync(`${OUT}/bridge.glb`).size,
 	terrainBytes: statSync(`${OUT}/terrain.glb`).size,
 	detailBytes: statSync(`${OUT}/stone-detail.png`).size,
+	exhibits: Object.fromEntries(shapes.map((m) => [m.name, m.indices.length / 3])),
+	exhibitsBytes: statSync(`${OUT}/exhibits.glb`).size,
+	particlesBytes: statSync(`${OUT}/particles.bin`).size,
 	seconds: (Date.now() - t0) / 1000,
 };
 console.log(JSON.stringify(report, null, 1));

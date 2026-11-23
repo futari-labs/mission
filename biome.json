@@ -6,6 +6,8 @@
 		"rules": {
 			"recommended": true,
 			"style": { "noNonNullAssertion": "off" },
+			"a11y": { "useValidAnchor": "off" },
+			"complexity": { "noImportantStyles": "off" },
 			"suspicious": { "noAssignInExpressions": "off" }
 		}
 	}

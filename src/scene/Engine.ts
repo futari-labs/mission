@@ -1,86 +1,122 @@
-// Owns the renderer, the frame loop, and the opening scene. One instance per page.
+// Owns the renderer and the frame loop. Each frame it reads scroll progress, asks the journey
+// for the camera pose and scene state, then adds pointer and ambient motion on top.
 import gsap from 'gsap';
 import { BlendFunction, BloomEffect, EffectComposer, EffectPass, NoiseEffect, RenderPass, ToneMappingEffect, ToneMappingMode, VignetteEffect } from 'postprocessing';
 import * as THREE from 'three';
+import { CHAPTERS, type ChapterId, chapterAt, chapterOpacity, nearestChapter, scrollProgress } from '../journey/chapters.ts';
 import { Atmosphere } from './atmosphere.ts';
+import { Beam } from './beam.ts';
 import { Bridge } from './bridge.ts';
-import { look, type Vec3Tuple } from './look.ts';
+import { type ExhibitSet, loadExhibits } from './exhibits.ts';
+import { Explore } from './explore.ts';
+import { emptyPose, emptyState, poseAt, STATION, stateAt } from './journey.ts';
+import { look } from './look.ts';
 import { loadDetailTexture, stoneUniforms } from './materials.ts';
 import { createSky, installFog } from './sky.ts';
 import { Terrain } from './terrain.ts';
+import { TransitionEffect } from './transition.ts';
+
+declare global {
+	interface Window {
+		__futariProbe?: { frames: number[]; script: number[]; camera: number[]; stats: () => { calls: number; triangles: number; dpr: number; width: number; height: number; progress: number; programs: number } };
+	}
+}
 
 export type EngineState = 'loading' | 'entering' | 'ready' | 'failed';
 
 export interface EngineOptions {
-	/** Skip the entrance and hold a deterministic frame. Used for captures and reduced motion. */
+	/** Skip the entrance and hold a deterministic frame. Used for captures. */
 	still: boolean;
 	reducedMotion: boolean;
 	onState: (state: EngineState) => void;
+	onChapter: (chapter: ChapterId | null) => void;
+	/** Opacity of one chapter's copy. Called only when the value changes. */
+	onCopy: (chapter: ChapterId, opacity: number) => void;
 }
-
-interface Shot {
-	position: Vec3Tuple;
-	target: Vec3Tuple;
-	fov: number;
-}
-
-const mix = (a: Shot, b: Shot, t: number): Shot => ({
-	position: a.position.map((v, i) => v + (b.position[i] - v) * t) as unknown as Vec3Tuple,
-	target: a.target.map((v, i) => v + (b.target[i] - v) * t) as unknown as Vec3Tuple,
-	fov: a.fov + (b.fov - a.fov) * t,
-});
 
 export class Engine {
+	private readonly canvas: HTMLCanvasElement;
+	private readonly options: EngineOptions;
 	private readonly renderer: THREE.WebGLRenderer;
 	private readonly composer: EffectComposer;
 	private readonly scene = new THREE.Scene();
 	private readonly camera = new THREE.PerspectiveCamera(27, 1, 0.3, 1200);
 	private readonly fog = new THREE.FogExp2(look.fog.color, look.fog.density);
+	private readonly lab = new THREE.Group();
 	private readonly bridge = new Bridge();
 	private readonly terrain = new Terrain();
 	private readonly atmosphere: Atmosphere;
+	private readonly beam: Beam;
+	private readonly transition: TransitionEffect;
+	private exhibits: ExhibitSet | null = null;
+	private explore: Explore | null = null;
 	private readonly timer = new THREE.Timer();
-	private loaded = false;
 	private readonly raycaster = new THREE.Raycaster();
 	private readonly pointer = new THREE.Vector2();
 	private readonly pointerSmooth = new THREE.Vector2();
 	private pointerActive = false;
-	private readonly intro = { camera: 0 };
+	private readonly coarse = matchMedia('(pointer: coarse)').matches;
+	/** Entrance blend: 0 is the high opening view, 1 hands the camera to scroll progress. */
+	private readonly intro = { camera: 0, fog: 1 };
 	private timeline: gsap.core.Timeline | null = null;
+	/** Damped scroll progress. The single input of the narrative. */
+	private progress = 0;
+	private chapter: ChapterId | null | undefined;
+	private readonly copy = new Map<ChapterId, number>();
+	private form = 0;
+	private readonly dim = { value: 0 };
+	private readonly pose = emptyPose();
+	private readonly introPose = emptyPose();
+	private readonly state = emptyState();
+	private loaded = false;
 	private frame = 0;
 	private running = false;
 	private disposed = false;
 	private slowFrames = 0;
 	private pixelRatio: number;
+	private probe: ((interval: number) => void) | null = null;
+	/** With ?probe: milliseconds of script time spent in each frame callback. */
+	private readonly scriptTimes: number[] = [];
 	private readonly cleanup: (() => void)[] = [];
-	private readonly target = new THREE.Vector3();
 	private readonly right = new THREE.Vector3();
-
-	private readonly canvas: HTMLCanvasElement;
-	private readonly options: EngineOptions;
 
 	constructor(canvas: HTMLCanvasElement, options: EngineOptions) {
 		this.canvas = canvas;
 		this.options = options;
 		installFog();
-		const coarse = matchMedia('(pointer: coarse)').matches;
-		this.pixelRatio = Math.min(devicePixelRatio, coarse ? 1.75 : 1.5);
+		this.pixelRatio = Math.min(devicePixelRatio, this.coarse ? 1.75 : 1.5);
 		this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: false });
 		this.renderer.setPixelRatio(this.pixelRatio);
 		this.renderer.toneMapping = THREE.NoToneMapping;
+		this.renderer.info.autoReset = false;
 		this.renderer.shadowMap.enabled = true;
 		this.renderer.shadowMap.type = THREE.PCFShadowMap;
-		this.composer = new EffectComposer(this.renderer, { frameBufferType: THREE.HalfFloatType, multisampling: coarse ? 2 : 4 });
+		this.renderer.shadowMap.autoUpdate = false;
+		this.composer = new EffectComposer(this.renderer, { frameBufferType: THREE.HalfFloatType, multisampling: this.coarse ? 2 : 4 });
 		this.scene.fog = this.fog;
-		this.atmosphere = new Atmosphere(this.fog, coarse ? 700 : 1500);
+		this.atmosphere = new Atmosphere(this.fog, this.coarse ? 700 : 1500);
+		this.beam = new Beam(this.coarse ? 260 : 520);
+		this.transition = new TransitionEffect(this.fog.color);
+		this.progress = scrollProgress();
 		this.buildPipeline();
 		this.buildLights();
 		this.bind();
 		this.resize();
+		if (new URLSearchParams(location.search).has('probe')) {
+			const frames: number[] = [];
+			const info = this.renderer.info;
+			const camera: number[] = [];
+			window.__futariProbe = { frames, script: this.scriptTimes, camera, stats: () => ({ calls: info.render.calls, triangles: info.render.triangles, dpr: this.pixelRatio, width: this.canvas.clientWidth, height: this.canvas.clientHeight, progress: this.progress, programs: info.programs?.length ?? 0 }) };
+			this.probe = (interval) => {
+				frames.push(interval);
+				camera.push(this.camera.position.x, this.camera.position.y, this.camera.position.z, this.progress);
+			};
+		}
 	}
 
 	private buildPipeline(): void {
 		this.composer.addPass(new RenderPass(this.scene, this.camera));
+		this.composer.addPass(new EffectPass(this.camera, this.transition));
 		const bloom = new BloomEffect({ mipmapBlur: true, intensity: look.bloom.intensity, luminanceThreshold: look.bloom.threshold, luminanceSmoothing: look.bloom.smoothing, radius: look.bloom.radius });
 		const grain = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: false });
 		grain.blendMode.opacity.value = look.grain;
@@ -90,8 +126,7 @@ export class Engine {
 	}
 
 	private buildLights(): void {
-		const sky = createSky(this.fog);
-		this.scene.add(sky);
+		this.scene.add(createSky(this.fog));
 		const pmrem = new THREE.PMREMGenerator(this.renderer);
 		const envScene = new THREE.Scene();
 		envScene.add(createSky(this.fog));
@@ -129,11 +164,8 @@ export class Engine {
 			if (e.pointerType !== 'mouse') this.pointerActive = false;
 		});
 		on('blur', () => (this.pointerActive = false));
-		// any intent to move on ends the entrance at once
-		for (const type of ['wheel', 'touchmove', 'keydown'] as const) on(type, () => this.skipEntrance());
 		const visibility = () => (document.hidden ? this.stop() : this.start());
 		document.addEventListener('visibilitychange', visibility);
-		this.cleanup.push(() => document.removeEventListener('visibilitychange', visibility));
 		const lost = (e: Event) => {
 			e.preventDefault();
 			this.stop();
@@ -147,6 +179,7 @@ export class Engine {
 		this.canvas.addEventListener('webglcontextlost', lost);
 		this.canvas.addEventListener('webglcontextrestored', restored);
 		this.cleanup.push(() => {
+			document.removeEventListener('visibilitychange', visibility);
 			this.canvas.removeEventListener('webglcontextlost', lost);
 			this.canvas.removeEventListener('webglcontextrestored', restored);
 		});
@@ -154,11 +187,14 @@ export class Engine {
 
 	async load(): Promise<void> {
 		this.options.onState('loading');
+		// The later chapters load alongside the opening, so a visitor who reloads mid-journey does not wait for the bridge first.
+		const later = this.loadLater();
 		try {
 			const [detail] = await Promise.all([loadDetailTexture('/assets/stone-detail.png'), this.bridge.load(), this.terrain.load()]);
 			if (this.disposed) return;
 			stoneUniforms.uDetail.value = detail;
-			this.scene.add(this.terrain.root, this.bridge.root, this.atmosphere.root);
+			this.lab.add(this.terrain.root, this.bridge.root, this.atmosphere.root);
+			this.scene.add(this.lab, this.beam.root, this.bridge.lights);
 			this.loaded = true;
 			this.renderer.compile(this.scene, this.camera);
 			this.enter();
@@ -167,15 +203,58 @@ export class Engine {
 			console.error('Opening scene failed to load', error);
 			this.options.onState('failed');
 		}
+		await later;
+	}
+
+	private async loadLater(): Promise<void> {
+		try {
+			const exhibits = await loadExhibits();
+			const explore = new Explore(this.fog, exhibits.base);
+			await explore.load(this.coarse ? 9000 : 24000);
+			if (this.disposed) return;
+			explore.setForm(this.form, true);
+			this.exhibits = exhibits;
+			this.explore = explore;
+			const groups = [exhibits.engineering.root, exhibits.kensaku.root, explore.root];
+			this.scene.add(...groups, exhibits.engineering.glow, exhibits.kensaku.glow, explore.lamp);
+			this.warm(groups);
+		} catch (error) {
+			// Their HTML stays readable over fog. Only the 3D of the later chapters is missing.
+			console.error('Later chapters failed to load', error);
+			document.documentElement.dataset.chapters = 'unavailable';
+		}
+	}
+
+	/**
+	 * Draws the later chapters once into a tiny offscreen target, so their shaders compile and their
+	 * buffers upload now, during the entrance, instead of stalling the first scroll into each chapter.
+	 */
+	private warm(groups: THREE.Object3D[]): void {
+		const target = new THREE.WebGLRenderTarget(32, 32, { type: THREE.HalfFloatType });
+		const eye = this.camera.clone();
+		const labWas = this.lab.visible;
+		this.lab.visible = false;
+		for (const group of groups) group.visible = true;
+		this.beam.update(1, 0);
+		for (const station of [STATION.engineering, STATION.kensaku, STATION.explore]) {
+			eye.position.set(station.x + 2, station.y + 1, station.z + 12);
+			eye.lookAt(station);
+			eye.updateMatrixWorld();
+			this.renderer.setRenderTarget(target);
+			this.renderer.render(this.scene, eye);
+		}
+		this.renderer.setRenderTarget(null);
+		target.dispose();
+		for (const group of groups) group.visible = false;
+		this.lab.visible = labWas;
 	}
 
 	private enter(): void {
 		const d = look.entrance.duration;
 		const tl = gsap.timeline({ onComplete: () => this.options.onState('ready') });
 		this.timeline = tl;
-		this.fog.density = look.fog.introDensity;
 		this.atmosphere.reveal = 0;
-		tl.to(this.fog, { density: look.fog.density, duration: d * 0.86, ease: 'power2.out' }, 0);
+		tl.to(this.intro, { fog: 0, duration: d * 0.86, ease: 'power2.out' }, 0);
 		tl.to(this.intro, { camera: 1, duration: d * 0.95, ease: 'power3.inOut' }, 0);
 		tl.to(this.atmosphere, { reveal: 1, duration: d * 0.5, ease: 'none' }, d * 0.4);
 		let last = 0;
@@ -191,22 +270,23 @@ export class Engine {
 		tl.to(this.bridge, { seamLevel: 1.9, duration: 0.22, ease: 'power2.out' }, last - 0.15);
 		tl.to(this.bridge, { seamLevel: 1, duration: 0.9, ease: 'power2.inOut' }, last + 0.07);
 		tl.call(() => this.options.onState('entering'), [], 0);
-		if (this.options.still || this.options.reducedMotion) tl.progress(1);
+		// arriving mid-page, for a capture, or with reduced motion: no entrance to watch
+		if (this.options.still || this.options.reducedMotion || this.progress > 0.02) tl.progress(1);
 	}
 
-	skipEntrance(): void {
-		if (this.timeline && this.timeline.progress() < 1) this.timeline.progress(1);
+	/** Scrolling during the entrance finishes it fast instead of cutting it, so the camera never snaps. */
+	private hurryEntrance(): void {
+		if (this.timeline && this.timeline.progress() < 1 && this.timeline.timeScale() === 1) this.timeline.timeScale(3.5);
 	}
 
-	private shot(): Shot {
-		const aspect = this.camera.aspect;
-		const t = THREE.MathUtils.smoothstep(aspect, 0.72, 1.45);
-		const c = look.camera;
-		const hero = mix(c.phone, c.desktop, t);
-		// between the two framings, pull back so the whole bridge stays in view
-		const wide = Math.max(1, 1.6 / Math.max(aspect, 0.72)) ** (0.55 * t);
-		const fitted: Shot = { ...hero, position: hero.position.map((v, i) => hero.target[i] + (v - hero.target[i]) * wide) as unknown as Vec3Tuple };
-		return mix(mix(c.introPhone, c.introDesktop, t), fitted, this.intro.camera);
+	setForm(index: number): void {
+		this.form = index;
+		this.explore?.setForm(index, this.options.reducedMotion || this.state.gather < 0.5);
+	}
+
+	/** Dims the scene behind the project dialog. */
+	setDim(on: boolean): void {
+		gsap.to(this.dim, { value: on ? 1 : 0, duration: this.options.reducedMotion ? 0 : 0.5, ease: 'power2.out', overwrite: true });
 	}
 
 	private resize(): void {
@@ -226,9 +306,12 @@ export class Engine {
 			if (!this.running) return;
 			this.frame = requestAnimationFrame(loop);
 			this.timer.update();
-			const dt = Math.min(this.timer.getDelta(), 0.05);
-			this.govern(dt);
-			this.render(dt);
+			const raw = this.timer.getDelta();
+			this.probe?.(raw * 1000);
+			this.govern(raw);
+			const began = this.probe ? performance.now() : 0;
+			this.render(Math.min(raw, 0.05));
+			if (this.probe) this.scriptTimes.push(performance.now() - began);
 		};
 		this.frame = requestAnimationFrame(loop);
 	}
@@ -250,30 +333,92 @@ export class Engine {
 
 	private render(dt: number): void {
 		if (!this.loaded) return;
-		const calm = this.options.still || this.options.reducedMotion;
+		const { still, reducedMotion } = this.options;
+		const calm = still || reducedMotion;
 		const time = calm ? 0 : this.timer.getElapsed();
-		const k = 1 - Math.exp(-dt * 3.2);
+		const wide = THREE.MathUtils.smoothstep(this.camera.aspect, 0.72, 1.45);
+
+		// 1. narrative: scroll progress, damped, is the only input
+		const goal = scrollProgress();
+		if (goal > 0.004) this.hurryEntrance();
+		this.progress = calm || dt === 0 ? goal : this.progress + (goal - this.progress) * (1 - Math.exp(-dt * 5.5));
+		if (Math.abs(goal - this.progress) < 1e-5) this.progress = goal;
+		poseAt(this.progress, wide, reducedMotion, this.pose);
+		// between the phone and desktop framings, pull the opening back so the whole bridge stays in view
+		if (this.progress <= 0.06) {
+			const fit = Math.max(1, 1.6 / Math.max(this.camera.aspect, 0.72)) ** (0.55 * wide);
+			this.pose.position.sub(this.pose.target).multiplyScalar(fit).add(this.pose.target);
+		}
+		stateAt(this.progress, this.pose.position.z, reducedMotion, this.state);
+		// with reduced motion there is no travel between chapters, so one chapter's copy always shows
+		const chapter = reducedMotion ? nearestChapter(this.progress).id : chapterAt(this.progress);
+		if (chapter !== this.chapter) {
+			this.chapter = chapter;
+			this.options.onChapter(chapter);
+		}
+		// the copy fades with scroll progress, not on a timer, so it reverses exactly and costs no layer changes
+		for (const c of CHAPTERS) {
+			const opacity = reducedMotion ? (c.id === chapter ? 1 : 0) : Math.round(chapterOpacity(c, this.progress) * 50) / 50;
+			if (this.copy.get(c.id) !== opacity) {
+				this.copy.set(c.id, opacity);
+				this.options.onCopy(c.id, opacity);
+			}
+		}
+
+		// 2. entrance: blends from the high opening view into whatever the narrative pose is
 		const settled = this.intro.camera > 0.999;
-		this.pointerSmooth.x += ((this.pointerActive && settled && !calm ? this.pointer.x : 0) - this.pointerSmooth.x) * k;
-		this.pointerSmooth.y += ((this.pointerActive && settled && !calm ? this.pointer.y : 0) - this.pointerSmooth.y) * k;
-		const shot = this.shot();
-		this.target.set(...shot.target);
-		this.camera.position.set(...shot.position);
-		this.camera.fov = shot.fov;
+		if (!settled) {
+			const c = look.camera;
+			this.introPose.position.set(...c.introPhone.position).lerp(this.right.set(...c.introDesktop.position), wide);
+			this.introPose.target.set(...c.introPhone.target).lerp(this.right.set(...c.introDesktop.target), wide);
+			this.pose.position.lerpVectors(this.introPose.position, this.pose.position, this.intro.camera);
+			this.pose.target.lerpVectors(this.introPose.target, this.pose.target, this.intro.camera);
+		}
+
+		// 3. temporary motion, added on top and never written back
+		const follow = this.pointerActive && settled && !calm;
+		const k = 1 - Math.exp(-dt * 3.2);
+		this.pointerSmooth.x += ((follow ? this.pointer.x : 0) - this.pointerSmooth.x) * k;
+		this.pointerSmooth.y += ((follow ? this.pointer.y : 0) - this.pointerSmooth.y) * k;
+		this.camera.position.copy(this.pose.position);
+		this.camera.fov = this.pose.fov;
 		this.camera.updateProjectionMatrix();
-		this.camera.lookAt(this.target);
+		this.camera.lookAt(this.pose.target);
 		this.right.setFromMatrixColumn(this.camera.matrixWorld, 0);
 		this.camera.position.addScaledVector(this.right, this.pointerSmooth.x * look.camera.parallax.x);
 		this.camera.position.y += this.pointerSmooth.y * look.camera.parallax.y + Math.sin(time * 0.23) * 0.03;
-		this.camera.lookAt(this.target);
+		this.camera.lookAt(this.pose.target);
 		this.camera.updateMatrixWorld();
 		let ray: THREE.Ray | null = null;
-		if (this.pointerActive && settled && !calm) {
+		if (follow) {
 			this.raycaster.setFromCamera(this.pointer, this.camera);
 			ray = this.raycaster.ray;
 		}
-		this.bridge.update(dt, ray, time);
-		this.atmosphere.update(time);
+
+		// 4. apply the state: only groups near the camera render
+		const s = this.state;
+		this.fog.density = s.fogDensity + (look.fog.introDensity - s.fogDensity) * this.intro.fog;
+		this.lab.visible = s.lab;
+		this.bridge.gate = s.gate;
+		if (s.lab) {
+			// the shadow map redraws only on frames where a block has moved
+			this.renderer.shadowMap.needsUpdate = this.bridge.update(dt, s.gate > 0.01 ? null : ray, time) || !settled;
+			this.atmosphere.update(time);
+		} else this.bridge.dark();
+		this.beam.update(s.beam * this.bridge.seamLevel, time);
+		const pointer = follow ? this.pointer : null;
+		if (this.exhibits) {
+			this.exhibits.engineering.visible = s.engineering;
+			this.exhibits.kensaku.visible = s.kensaku;
+			if (s.engineering) this.exhibits.engineering.update(dt, this.chapter === 'engineering' ? pointer : null, time);
+			if (s.kensaku) this.exhibits.kensaku.update(dt, this.chapter === 'kensaku' ? pointer : null, time);
+		}
+		if (this.explore) {
+			this.explore.visible = s.explore;
+			if (s.explore) this.explore.update(dt, s, this.chapter === 'explore' ? ray : null, time, calm);
+		}
+		this.transition.set(s.frost, s.front, s.white, this.dim.value, time);
+		this.renderer.info.reset();
 		this.composer.render(dt);
 	}
 
@@ -281,10 +426,14 @@ export class Engine {
 		this.disposed = true;
 		this.stop();
 		this.timeline?.kill();
+		gsap.killTweensOf(this.dim);
 		for (const fn of this.cleanup) fn();
 		this.bridge.dispose();
 		this.terrain.dispose();
 		this.atmosphere.dispose();
+		this.beam.dispose();
+		this.exhibits?.dispose();
+		this.explore?.dispose();
 		stoneUniforms.uDetail.value?.dispose();
 		this.scene.environment?.dispose();
 		this.composer.dispose();

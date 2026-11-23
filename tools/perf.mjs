@@ -1,0 +1,64 @@
+// Measures frame intervals (time between animation frames as seen by the page, not GPU time),
+// draw calls, triangles, and loading for the opening and, when the page scrolls, the full journey.
+// Usage: node tools/perf.mjs [base-url] [--headless] [--dpr=2] [--phone]
+import { chromium } from 'playwright-core';
+
+const base = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'http://localhost:4173';
+const headless = process.argv.includes('--headless');
+const phone = process.argv.includes('--phone');
+const dpr = Number(process.argv.find((a) => a.startsWith('--dpr='))?.slice(6) ?? (phone ? 2 : 1));
+const browser = await chromium.launch({ channel: 'chrome', headless, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+const context = await browser.newContext({ viewport, deviceScaleFactor: dpr, isMobile: phone, hasTouch: phone });
+const page = await context.newPage();
+
+const summarize = (frames) => {
+	const s = [...frames].sort((a, b) => a - b);
+	const at = (q) => s[Math.min(s.length - 1, Math.floor(s.length * q))];
+	return { frames: s.length, mean: +(s.reduce((a, b) => a + b, 0) / s.length).toFixed(1), p50: +at(0.5).toFixed(1), p95: +at(0.95).toFixed(1), p99: +at(0.99).toFixed(1), max: +s[s.length - 1].toFixed(1), over33ms: s.filter((x) => x > 33.4).length };
+};
+const take = async (label) => {
+	const r = await page.evaluate(() => ({ frames: window.__futariProbe.frames.splice(0), stats: window.__futariProbe.stats() }));
+	console.log(label.padEnd(26), JSON.stringify({ ...summarize(r.frames), calls: r.stats.calls, triangles: r.stats.triangles }));
+	return r.stats;
+};
+
+const t0 = Date.now();
+await page.goto(`${base}/?probe`);
+await page.waitForFunction(() => window.__futari?.state === 'entering', null, { timeout: 30000 });
+const enteringAt = Date.now() - t0;
+await page.evaluate(() => window.__futariProbe.frames.splice(0));
+await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
+const stats = await take('entrance');
+const load = await page.evaluate(() => performance.getEntriesByType('resource').filter((r) => /assets\/.*\.(glb|png|bin)|Engine/.test(r.name)).map((r) => ({ name: r.name.split('/').pop().slice(0, 28), kb: Math.round(r.transferSize / 1024), ms: Math.round(r.responseEnd) })));
+console.log('environment'.padEnd(26), JSON.stringify({ chrome: browser.version(), headless, viewport, dpr: stats.dpr, canvas: [stats.width, stats.height], sceneVisibleAfterMs: enteringAt }));
+console.log('loading'.padEnd(26), JSON.stringify(load));
+
+await page.waitForTimeout(1500);
+await page.evaluate(() => window.__futariProbe.frames.splice(0));
+await page.waitForTimeout(3000);
+await take('rest, 3 s');
+for (let i = 0; i < 4; i++) {
+	await page.mouse.move(viewport.width * 0.25, viewport.height * 0.42, { steps: 30 });
+	await page.mouse.move(viewport.width * 0.75, viewport.height * 0.4, { steps: 30 });
+}
+await take('pointer sweeps');
+
+const max = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+if (max > 50) {
+	await page.mouse.move(viewport.width / 2, viewport.height / 2);
+	const scroll = async (dir, label) => {
+		await page.evaluate(() => window.__futariProbe.frames.splice(0));
+		// about one viewport per second, in small wheel steps, like a steady trackpad scroll
+		const step = (viewport.height / 60) * dir;
+		for (let y = 0; y < max; y += Math.abs(step)) {
+			await page.mouse.wheel(0, step);
+			await page.waitForTimeout(16);
+		}
+		await page.waitForTimeout(600);
+		await take(label);
+	};
+	await scroll(1, 'journey forward');
+	await scroll(-1, 'journey reverse');
+}
+await browser.close();
