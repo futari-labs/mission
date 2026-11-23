@@ -106,7 +106,7 @@ export class Bridge {
 		this.light = new THREE.PointLight(look.seam.color, 0, 16, 2);
 		this.light.position.copy(this.seamPosition).add(new THREE.Vector3(0, -0.1, 0.5));
 		this.pool = new THREE.PointLight(look.seam.color, 0, 11, 2);
-		this.pool.position.set(0, 1.6, 0.4);
+		this.pool.position.set(0, 3, 0.6);
 		this.touch = new THREE.PointLight(look.seam.color, 0, 7, 2);
 		this.root.add(this.core, this.halo, this.light, this.pool, this.touch);
 	}

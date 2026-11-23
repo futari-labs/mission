@@ -43,11 +43,11 @@ export class Atmosphere {
 		this.root.add(this.snow(particles));
 		// x, y, z, width, height, opacity, drift speed
 		const banks: [number, number, number, number, number, number, number][] = [
-			[4, 2.2, -13, 70, 9, 0.34, 0.006],
+			[4, 1.8, -15, 76, 8, 0.3, 0.006],
 			[-34, 6, -34, 90, 20, 0.42, 0.004],
 			[38, 7, -48, 100, 24, 0.4, -0.005],
 			[0, 12, -84, 190, 40, 0.34, 0.003],
-			[-6, -1.2, 12, 60, 5, 0.3, -0.008],
+			[-10, -1.6, 9, 64, 4.5, 0.16, -0.008],
 		];
 		for (const b of banks) this.root.add(this.bank(...b));
 	}

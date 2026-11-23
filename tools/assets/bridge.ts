@@ -65,7 +65,7 @@ function buildHalf(spec: HalfSpec): Block[] {
 	const rand = mulberry32(spec.seed);
 	const jitter = (a: number, b: number) => a + (b - a) * rand();
 	const deck: Pt[] = [[BACK, 5.25], [PC, 5.42], [TIP, spec.tipY]];
-	const soffitFront: Pt[] = [[PX1, HY], [-2.15, 4.5], [TIP, spec.tipY - 0.62]];
+	const soffitFront: Pt[] = [[PX1, HY], [-2.15, 4.5], [TIP, spec.tipY - 0.7]];
 	const soffitBack: Pt[] = [[BACK, 4.05], [PX0, HY]];
 	const deckY = (x: number) => piecewise(deck, x);
 	const blocks: Block[] = [];
@@ -142,7 +142,7 @@ function buildHalf(spec: HalfSpec): Block[] {
 			const mid = (fr[i] + fr[i + 1]) / 2;
 			const toward = kind === 'front' ? 1 : -1;
 			order = armOrder + i;
-			add(kind, [...bottom, ...topPts], lerp(d0, d1, mid) + jitter(-0.05, 0.05), [0.55 * toward, 0.75, 0.35], hi - lo > 0.55, 2);
+			add(kind, [...bottom, ...topPts], lerp(d0, d1, mid) + jitter(-0.05, 0.05), [0.55 * toward, 0.75, 0.35], false, 2);
 		}
 		order = armOrder + fr.length - 1;
 	};
@@ -157,7 +157,7 @@ export const BLOCKS: Block[] = HALVES.flatMap(buildHalf);
 
 export const SEAM = {
 	gap: SEAM_GAP,
-	yMin: Math.min(...HALVES.map((h) => h.tipY - 0.62)),
+	yMin: Math.min(...HALVES.map((h) => h.tipY - 0.7)),
 	yMax: Math.max(...HALVES.map((h) => h.tipY)),
 	depth: 1.92,
 };

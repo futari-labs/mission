@@ -45,7 +45,9 @@ export function App() {
 
 	return (
 		<div className="site" data-phase={phase}>
-			<canvas ref={canvas} className="scene" aria-hidden="true" />
+			<div className="scene" aria-hidden="true">
+				<canvas ref={canvas} />
+			</div>
 			<header className="mast">
 				<a className="wordmark" href="/" aria-label={`${site.wordmark}, home`}>
 					<svg viewBox="0 0 34 14" aria-hidden="true">

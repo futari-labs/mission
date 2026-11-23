@@ -83,11 +83,11 @@ float fGrain = fH1 * 0.62 + fH2 * 0.38;`;
 const BRIDGE_ALBEDO = /* glsl */ `
 ${SHARED_ALBEDO}
 float fAo = mix(vBake.r, vBake.g, uLoosen);
-float fEdge = smoothstep(0.57, 0.82, vBake.b);
+float fEdge = smoothstep(0.62, 0.92, vBake.b);
 float fCrease = smoothstep(0.47, 0.25, vBake.b);
 vec3 fStone = mix(uColA, uColB, smoothstep(0.25, 0.8, fGrain)) * (0.9 + 0.2 * vBake.a);
-fStone = mix(fStone, uColB * 1.14, fEdge * 0.55);
-float fFrost = clamp(smoothstep(0.3, 0.86, fN.y + (fGrain - 0.5) * 0.7) * 0.92 + fEdge * 0.3 + fCrease * 0.2 * step(0.0, fN.y), 0.0, 1.0);
+fStone = mix(fStone, uColB * 1.1, fEdge * 0.4);
+float fFrost = clamp(smoothstep(0.3, 0.86, fN.y + (fGrain - 0.5) * 0.7) * 0.9 + fEdge * 0.1 + fCrease * 0.2 * step(0.0, fN.y), 0.0, 1.0);
 diffuseColor.rgb = mix(fStone, uColC, fFrost) * mix(1.0, fAo, 0.4);
 float fRough = mix(0.93, 0.7, fFrost) - 0.1 * (fGrain - 0.5);`;
 
@@ -95,11 +95,13 @@ float fRough = mix(0.93, 0.7, fFrost) - 0.1 * (fGrain - 0.5);`;
 const TERRAIN_ALBEDO = /* glsl */ `
 ${SHARED_ALBEDO}
 float fAo = vBake.r;
-float fSnow = smoothstep(0.3, 0.68, vBake.g + (fGrain - 0.5) * 0.45);
-vec3 fRock = mix(uColA, uColB, smoothstep(0.2, 0.85, fGrain));
-vec3 fGround = mix(fRock, uColC * (0.93 + 0.14 * vBake.a), fSnow);
-diffuseColor.rgb = fGround * clamp(0.62 + 0.76 * vBake.b, 0.55, 1.18) * mix(1.0, fAo, 0.5);
-float fRough = mix(0.96, 0.82, fSnow);`;
+float fSnow = smoothstep(0.36, 0.6, vBake.g + (fH1 - 0.5) * 0.8 + (fH2 - 0.5) * 0.55);
+vec3 fRock = mix(uColA, uColB, smoothstep(0.3, 0.7, fH2 * 0.7 + fH1 * 0.3));
+vec3 fGround = mix(fRock, uColC * (0.9 + 0.2 * vBake.a) * (0.94 + 0.12 * fH2), fSnow);
+diffuseColor.rgb = fGround * clamp(0.5 + 1.0 * vBake.b, 0.5, 1.22) * mix(1.0, fAo, 0.5);
+float fRough = mix(0.96, 0.82, fSnow);
+fO1 *= mix(1.7, 1.0, fSnow);
+fO2 *= mix(1.9, 1.0, fSnow);`;
 
 export type StoneKind = 'bridge' | 'terrain';
 
@@ -126,7 +128,7 @@ export function createStoneMaterial(kind: StoneKind): THREE.MeshStandardMaterial
 			.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(fRough, 0.05, 1.0);')
 			.replace(
 				'#include <normal_fragment_maps>',
-				`#include <normal_fragment_maps>\nnormal = normalize((viewMatrix * vec4(normalize(fN + ${bridge ? '0.5' : '0.62'} * fO1 + ${bridge ? '0.38' : '0.42'} * fO2), 0.0)).xyz);`,
+				`#include <normal_fragment_maps>\nnormal = normalize((viewMatrix * vec4(normalize(fN + ${bridge ? '0.5' : '0.85'} * fO1 + ${bridge ? '0.38' : '0.6'} * fO2), 0.0)).xyz);`,
 			)
 			.replace(
 				'#include <aomap_fragment>',

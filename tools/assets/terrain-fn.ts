@@ -20,6 +20,8 @@ function peak(x: number, z: number, wx: number, wz: number, cx: number, cz: numb
 export interface TerrainSample {
 	h: number;
 	rocky: number;
+	/** Where wind has stripped the snow off near rock. Only the foreground and the platform flank. */
+	scour: number;
 }
 
 export function terrain(x: number, z: number): TerrainSample {
@@ -30,34 +32,39 @@ export function terrain(x: number, z: number): TerrainSample {
 	const r = Math.hypot(x, z);
 
 	let h = 1.5 * N.fbm(wx * 0.034, 0.3, wz * 0.034, 3);
-	h -= 2.7 * smooth(0.9, 2.1, e) * (1 - smooth(40, 85, r));
+	h -= 3.1 * smooth(0.86, 1.7, e) * (1 - smooth(44, 90, r));
 
 	const back = 0.28 + 0.72 * smooth(16, -36, z);
-	const mmask = smooth(30, 98, r) * back;
-	h += mmask * (N.ridged(wx * 0.0105, 2.3, wz * 0.0105, 5) * 54 - 8);
+	const mmask = smooth(58, 150, r) * back;
+	h += mmask * (N.ridged(wx * 0.0105, 2.3, wz * 0.0105, 5) * 30 - 5);
 	const peaks =
-		peak(x, z, wx, wz, -58, -68, 30, 38) +
-		peak(x, z, wx, wz, 62, -94, 34, 31) +
-		peak(x, z, wx, wz, 40, -12, 13, 8) +
-		peak(x, z, wx, wz, -38, -10, 11, 5.5) +
-		peak(x, z, wx, wz, 10, -58, 22, 11);
+		peak(x, z, wx, wz, -10, -124, 38, 46) +
+		peak(x, z, wx, wz, -70, -90, 36, 30) +
+		peak(x, z, wx, wz, 98, -150, 50, 34) +
+		peak(x, z, wx, wz, 58, -34, 17, 9) +
+		peak(x, z, wx, wz, -54, -24, 15, 7) +
+		peak(x, z, wx, wz, 44, -84, 20, 7);
 	h += peaks;
 
-	const fgSeg = segment(x, z, -27, 24.4, 5, 19.2);
-	const fgShape = Math.exp(-((fgSeg.d / 3.3) ** 2));
-	const fgH = lerp(4.9, 1.7, smooth(0.25, 1, fgSeg.t)) * (0.55 + 0.45 * smooth(0, 0.22, fgSeg.t));
+	// placed from the desktop hero camera: far end at the left edge of frame, near end low at bottom center
+	const fgSeg = segment(x, z, -16.2, 19.2, -3.4, 27.6);
+	const fgShape = Math.exp(-((fgSeg.d / 3.1) ** 2));
+	const fgH = 4.9 * (0.55 + 0.45 * smooth(0, 0.2, fgSeg.t)) * (1 - 0.62 * smooth(0.4, 1, fgSeg.t));
 	const fg = fgH * fgShape * (0.72 + 0.5 * N.ridged(x * 0.15, 1.1, z * 0.15, 3));
 	h += fg;
 
 	h = lerp(h, 0.1 * N.fbm(x * 0.12, 3.3, z * 0.12, 2), plat);
 
-	const rocky = clamp(mmask * 1.3 + fg / 3.2 + peaks / 9);
-	h += (0.42 * N.ridged(x * 0.21, 4.4, z * 0.21, 3) - 0.16) * (0.12 + 0.88 * rocky) * (1 - plat * 0.85);
+	const flank = smooth(0.8, 1.25, e) * (1 - smooth(1.5, 2.4, e));
+	const rocky = clamp(mmask * 1.3 + fg / 2.6 + peaks / 9 + flank * 0.7);
+	h += (0.62 * N.ridged(x * 0.21, 4.4, z * 0.21, 4) - 0.22) * (0.1 + 0.9 * rocky) * (1 - plat * 0.85);
+	h += 0.16 * (N.ridged(x * 0.9, 1.9, z * 0.9, 2) - 0.4) * rocky;
 	h += 0.06 * N.fbm(x * 0.8, 8.8, z * 0.8, 2) * (1 - plat * 0.4);
 	const a = 0.55;
 	const ripple = Math.sin((x * Math.cos(a) + z * Math.sin(a)) * 6.8 + 4.5 * N.n3(x * 0.22, 6.1, z * 0.22));
-	h += 0.02 * ripple * (1 - rocky) * (0.4 + 0.6 * smooth(-0.2, 0.5, N.n3(x * 0.07, 2.2, z * 0.07)));
-	return { h, rocky };
+	const drift = Math.sin((x * 0.31 - z * 0.95) * 2.9 + 5 * N.n3(x * 0.13, 4.4, z * 0.13));
+	h += (0.007 * ripple + 0.012 * drift) * (1 - rocky) * smooth(-0.25, 0.45, N.n3(x * 0.09, 2.2, z * 0.09));
+	return { h, rocky, scour: clamp(fg / 2.4 + flank * 0.75) };
 }
 
 export const terrainHeight = (x: number, z: number): number => terrain(x, z).h;

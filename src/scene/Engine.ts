@@ -1,6 +1,6 @@
 // Owns the renderer, the frame loop, and the opening scene. One instance per page.
 import gsap from 'gsap';
-import { BloomEffect, EffectComposer, EffectPass, NoiseEffect, RenderPass, ToneMappingEffect, ToneMappingMode, VignetteEffect, BlendFunction } from 'postprocessing';
+import { BlendFunction, BloomEffect, EffectComposer, EffectPass, NoiseEffect, RenderPass, ToneMappingEffect, ToneMappingMode, VignetteEffect } from 'postprocessing';
 import * as THREE from 'three';
 import { Atmosphere } from './atmosphere.ts';
 import { Bridge } from './bridge.ts';

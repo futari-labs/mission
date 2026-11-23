@@ -1,11 +1,13 @@
 // Captures the opening scene from a running preview server.
-// Usage: node tools/capture.mjs <out-dir> [base-url] [--entrance]
+// Usage: node tools/capture.mjs <out-dir> [base-url] [--entrance] [--bare]
+// --bare hides the HTML overlay. Use it to regenerate public/fallback/.
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
 
 const [out = 'captures', base = 'http://localhost:4173'] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const entrance = process.argv.includes('--entrance');
+const bare = process.argv.includes('--bare');
 fs.mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const views = [
@@ -30,6 +32,7 @@ for (const v of views) {
 	} else {
 		await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
 		await page.waitForTimeout(700);
+		if (bare) await page.addStyleTag({ content: '.mast,.intro,.hint,.loader{visibility:hidden}' });
 		await page.screenshot({ path: path.join(out, `hero-${v.name}.jpg`), type: 'jpeg', quality: 90 });
 	}
 	console.log(v.name, `${Date.now() - t0} ms`, errors.slice(0, 4).join(' | ') || 'no errors');

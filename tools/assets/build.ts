@@ -100,7 +100,7 @@ function bakeTerrain(name: string, x0: number, x1: number, z0: number, z1: numbe
 			normals.set(n, v * 3);
 			const c = Math.max(0.45, step);
 			const cavity = (terrainHeight(x + c, z) + terrainHeight(x - c, z) + terrainHeight(x, z + c) + terrainHeight(x, z - c) - 4 * s.h) / c;
-			const snow = smooth(0.7, 0.9, n[1] + 0.1 * N.n3(x * 0.4, 1.7, z * 0.4) + 0.06 * N.n3(x * 1.7, 3.1, z * 1.7)) * (1 - 0.55 * s.rocky * smooth(0.95, 0.8, n[1]));
+			const snow = smooth(0.5, 0.8, n[1] + 0.07 * N.n3(x * 0.4, 1.7, z * 0.4) + 0.05 * N.n3(x * 1.7, 3.1, z * 1.7)) * (1 - 0.6 * s.rocky * smooth(0.97, 0.78, n[1])) * (1 - 0.8 * s.scour * smooth(-0.05, 0.3, N.fbm(x * 0.33, 5.5, z * 0.33, 2)));
 			let ao = 1;
 			if (withBridge && Math.abs(x) < 12 && Math.abs(z) < 6) {
 				const p: Vec3 = [x, s.h + 0.02, z];
