@@ -1,0 +1,13 @@
+entrance                   {"frames":493,"mean":7.1,"p50":6.9,"p95":7.7,"p99":8.6,"max":86.5,"over33ms":1,"calls":46,"triangles":507094}
+rest, 3 s                  {"frames":432,"mean":6.9,"p50":6.9,"p95":8,"p99":8.5,"max":8.7,"over33ms":0,"calls":46,"triangles":507094}
+lap 1, downward            {"frames":2919,"mean":6.9,"p50":6.9,"p95":8.4,"p99":8.8,"max":15,"over33ms":0,"calls":56,"triangles":649966}
+lap 2, downward            {"frames":2890,"mean":6.9,"p50":6.9,"p95":8.4,"p99":8.9,"max":11.1,"over33ms":0,"calls":56,"triangles":649966}
+one lap upward             {"frames":2882,"mean":6.9,"p50":6.9,"p95":8.4,"p99":8.9,"max":12.2,"over33ms":0,"calls":46,"triangles":507094}
+resources                  {"programs":[41,41],"geometries":[75,75],"textures":[26,26],"requests":11,"heapMB":29,"rebases":3}
+DPR1.5 rest, 3 s                  {"frames":298,"mean":10.1,"p50":9.7,"p95":11.9,"p99":12.3,"max":12.8,"over33ms":0,"calls":46,"triangles":507094}
+DPR1.5 lap 1, downward            {"frames":2301,"mean":10.1,"p50":9.6,"p95":16.5,"p99":22.7,"max":63.3,"over33ms":8,"calls":46,"triangles":507094}
+DPR1.5 opening at rest         {"calls":46,"triangles":507094,"meanMs":18.2,"p95Ms":22.7}
+DPR1.5 engineering at rest     {"calls":42,"triangles":178242,"meanMs":10.3,"p95Ms":12.4}
+DPR1.5 kensaku at rest         {"calls":42,"triangles":186734,"meanMs":9.5,"p95Ms":11.6}
+DPR1.5 ring passage            {"calls":36,"triangles":299758,"meanMs":9.8,"p95Ms":11.3}
+DPR1.5 explore at rest         {"calls":31,"triangles":95362,"meanMs":13.6,"p95Ms":15.6}

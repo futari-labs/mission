@@ -1,0 +1,17 @@
+entrance                   {"frames":495,"mean":7.1,"p50":6.9,"p95":8,"p99":8.5,"max":91.9,"over33ms":1,"calls":39,"triangles":486750}
+loading                    [{"name":"Engine-3fR49MYY.js","kb":220,"ms":90},{"name":"exhibits.glb","kb":2099,"ms":154},{"name":"landmark.glb","kb":930,"ms":152},{"name":"terrain.glb","kb":1896,"ms":155},{"name":"stone-detail.png","kb":175,"ms":150},{"name":"particles.bin","kb":422,"ms":190}]
+rest, 3 s                  {"frames":432,"mean":6.9,"p50":6.9,"p95":7.6,"p99":8.3,"max":8.7,"over33ms":0,"calls":39,"triangles":486750}
+lap 1, downward            {"frames":2897,"mean":7,"p50":6.9,"p95":8.3,"p99":8.7,"max":15.7,"over33ms":0,"calls":49,"triangles":629622}
+lap 2, downward            {"frames":2907,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.7,"max":9.2,"over33ms":0,"calls":49,"triangles":629622}
+one lap upward             {"frames":2882,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.7,"max":9.4,"over33ms":0,"calls":39,"triangles":486750}
+resources                  {"programs":[33,33],"geometries":[68,68],"textures":[25,25],"requests":11,"heapMB":28,"rebases":3}
+opening at rest            {"calls":39,"triangles":486750,"meanMs":6.9,"p95Ms":7.6}
+engineering, half built    {"calls":32,"triangles":95194,"meanMs":7,"p95Ms":7.7}
+engineering at rest        {"calls":35,"triangles":157898,"meanMs":6.9,"p95Ms":7.5}
+kensaku, half built        {"calls":31,"triangles":97174,"meanMs":6.9,"p95Ms":7.5}
+kensaku at rest            {"calls":35,"triangles":166390,"meanMs":6.9,"p95Ms":7.6}
+ring passage, ring 1       {"calls":29,"triangles":441462,"meanMs":6.9,"p95Ms":7.5}
+ring passage, ring 2       {"calls":30,"triangles":442614,"meanMs":6.9,"p95Ms":7.3}
+explore at rest            {"calls":24,"triangles":75018,"meanMs":6.9,"p95Ms":7.1}
+return, mid                {"calls":40,"triangles":486750,"meanMs":6.9,"p95Ms":7.3}
+ring passage, ring 1 after coarsening {"calls":29,"triangles":279414}

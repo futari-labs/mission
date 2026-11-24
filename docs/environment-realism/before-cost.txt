@@ -1,0 +1,30 @@
+## DPR 1
+winter, opening                {"calls":46,"triangles":507038,"meanMs":6.9,"p95Ms":7.5}
+spring, engineering building   {"calls":41,"triangles":131802,"meanMs":6.9,"p95Ms":7.6}
+spring, engineering rest       {"calls":44,"triangles":194506,"meanMs":6.9,"p95Ms":7.6}
+summer, kensaku building       {"calls":40,"triangles":133782,"meanMs":6.9,"p95Ms":7.5}
+summer, kensaku rest           {"calls":44,"triangles":202998,"meanMs":7,"p95Ms":7.5}
+ring passage                   {"calls":38,"triangles":316022,"meanMs":6.9,"p95Ms":7.6}
+autumn, explore rest           {"calls":33,"triangles":111626,"meanMs":6.9,"p95Ms":7.6}
+return, start                  {"calls":32,"triangles":111626,"meanMs":6.9,"p95Ms":7.5}
+environment                    {"viewport":{"width":1440,"height":900},"requestedDpr":1,"renderedPixelRatio":1,"emulatedPhone":false,"chrome":"158.0.8127.88"}
+## DPR 2 requested
+winter, opening                {"calls":46,"triangles":507038,"meanMs":8.9,"p95Ms":9.3}
+spring, engineering building   {"calls":41,"triangles":131802,"meanMs":6.9,"p95Ms":7.5}
+spring, engineering rest       {"calls":44,"triangles":194506,"meanMs":7.8,"p95Ms":8.3}
+summer, kensaku building       {"calls":40,"triangles":133782,"meanMs":6.9,"p95Ms":7.4}
+summer, kensaku rest           {"calls":44,"triangles":202998,"meanMs":7.3,"p95Ms":8.1}
+ring passage                   {"calls":38,"triangles":316022,"meanMs":6.9,"p95Ms":7.5}
+autumn, explore rest           {"calls":33,"triangles":111626,"meanMs":6.9,"p95Ms":7.7}
+return, start                  {"calls":32,"triangles":111626,"meanMs":6.9,"p95Ms":7.6}
+environment                    {"viewport":{"width":1440,"height":900},"requestedDpr":2,"renderedPixelRatio":1.5,"emulatedPhone":false,"chrome":"158.0.8127.88"}
+## phone viewport, emulated
+winter, opening                {"calls":46,"triangles":507024,"meanMs":6.9,"p95Ms":7.6}
+spring, engineering building   {"calls":41,"triangles":127588,"meanMs":6.9,"p95Ms":7.7}
+spring, engineering rest       {"calls":44,"triangles":190292,"meanMs":6.9,"p95Ms":7.4}
+summer, kensaku building       {"calls":40,"triangles":129568,"meanMs":6.9,"p95Ms":7.5}
+summer, kensaku rest           {"calls":43,"triangles":198784,"meanMs":6.9,"p95Ms":7.4}
+ring passage                   {"calls":38,"triangles":311808,"meanMs":6.9,"p95Ms":7.7}
+autumn, explore rest           {"calls":33,"triangles":107412,"meanMs":6.9,"p95Ms":7.6}
+return, start                  {"calls":32,"triangles":107412,"meanMs":6.9,"p95Ms":7.6}
+environment                    {"viewport":{"width":390,"height":844},"requestedDpr":3,"renderedPixelRatio":1.75,"emulatedPhone":true,"chrome":"158.0.8127.88"}

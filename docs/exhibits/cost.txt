@@ -1,0 +1,79 @@
+# Frame intervals with the scene held still at each position. Headed Chrome, 1440 by 900 unless noted.
+# 'calls' and 'triangles' are sampled in that scene, not at the end of a lap. 'before' is commit 0cea7ce.
+
+## before, uncapped --dpr=2
+winter, opening                {"calls":46,"triangles":507038,"meanMs":8.6,"p95Ms":9.6}
+spring, engineering building   {"calls":63,"triangles":649960,"meanMs":6.8,"p95Ms":8.3}
+spring, engineering rest       {"calls":66,"triangles":712664,"meanMs":8.8,"p95Ms":9.8}
+summer, kensaku building       {"calls":62,"triangles":651940,"meanMs":6.6,"p95Ms":7.3}
+summer, kensaku rest           {"calls":66,"triangles":721156,"meanMs":8.3,"p95Ms":9.3}
+ring passage                   {"calls":60,"triangles":834180,"meanMs":6.9,"p95Ms":8.4}
+autumn, explore rest           {"calls":55,"triangles":629784,"meanMs":6.4,"p95Ms":7}
+return, start                  {"calls":54,"triangles":629784,"meanMs":5.5,"p95Ms":6.9}
+environment                    {"viewport":{"width":1440,"height":900},"requestedDpr":2,"renderedPixelRatio":1.5,"emulatedPhone":false,"uncapped":true,"chrome":"158.0.8127.88"}
+
+## after, uncapped --dpr=2
+winter, opening                {"calls":46,"triangles":507038,"meanMs":8.6,"p95Ms":9.6}
+spring, engineering building   {"calls":77,"triangles":643706,"meanMs":7,"p95Ms":8.2}
+spring, engineering rest       {"calls":78,"triangles":644058,"meanMs":6.9,"p95Ms":7.3}
+summer, kensaku building       {"calls":71,"triangles":675778,"meanMs":6.8,"p95Ms":8.1}
+summer, kensaku rest           {"calls":73,"triangles":676130,"meanMs":6.9,"p95Ms":7.7}
+ring passage                   {"calls":64,"triangles":840250,"meanMs":7,"p95Ms":8.3}
+autumn, explore rest           {"calls":57,"triangles":635742,"meanMs":6.5,"p95Ms":7.1}
+return, start                  {"calls":56,"triangles":635742,"meanMs":5.5,"p95Ms":6.9}
+environment                    {"viewport":{"width":1440,"height":900},"requestedDpr":2,"renderedPixelRatio":1.5,"emulatedPhone":false,"uncapped":true,"chrome":"158.0.8127.88"}
+
+## before, uncapped --phone
+winter, opening                {"calls":46,"triangles":507024,"meanMs":2.7,"p95Ms":4.3}
+spring, engineering building   {"calls":55,"triangles":379486,"meanMs":2.1,"p95Ms":3.2}
+spring, engineering rest       {"calls":58,"triangles":442190,"meanMs":2.9,"p95Ms":4.1}
+summer, kensaku building       {"calls":54,"triangles":381466,"meanMs":2,"p95Ms":3.2}
+summer, kensaku rest           {"calls":57,"triangles":450682,"meanMs":2.6,"p95Ms":4.2}
+ring passage                   {"calls":52,"triangles":563706,"meanMs":2.3,"p95Ms":3.3}
+autumn, explore rest           {"calls":47,"triangles":359310,"meanMs":2.1,"p95Ms":3.3}
+return, start                  {"calls":46,"triangles":359310,"meanMs":2,"p95Ms":3.3}
+environment                    {"viewport":{"width":390,"height":844},"requestedDpr":3,"renderedPixelRatio":1.75,"emulatedPhone":true,"uncapped":true,"chrome":"158.0.8127.88"}
+
+## after, uncapped --phone
+winter, opening                {"calls":46,"triangles":507024,"meanMs":2.7,"p95Ms":4.3}
+spring, engineering building   {"calls":69,"triangles":373530,"meanMs":2.1,"p95Ms":3.4}
+spring, engineering rest       {"calls":70,"triangles":373882,"meanMs":2.2,"p95Ms":3.3}
+summer, kensaku building       {"calls":63,"triangles":405602,"meanMs":2.2,"p95Ms":3.5}
+summer, kensaku rest           {"calls":64,"triangles":405954,"meanMs":2.2,"p95Ms":3.2}
+ring passage                   {"calls":56,"triangles":570074,"meanMs":2.3,"p95Ms":3.2}
+autumn, explore rest           {"calls":49,"triangles":365566,"meanMs":2.1,"p95Ms":3.2}
+return, start                  {"calls":48,"triangles":365566,"meanMs":2,"p95Ms":3.2}
+environment                    {"viewport":{"width":390,"height":844},"requestedDpr":3,"renderedPixelRatio":1.75,"emulatedPhone":true,"uncapped":true,"chrome":"158.0.8127.88"}
+
+## after, display-capped --dpr=1
+winter, opening                {"calls":46,"triangles":507038,"meanMs":6.9,"p95Ms":7}
+spring, engineering building   {"calls":77,"triangles":643706,"meanMs":6.9,"p95Ms":7.1}
+spring, engineering rest       {"calls":78,"triangles":644058,"meanMs":6.9,"p95Ms":7.1}
+summer, kensaku building       {"calls":71,"triangles":675778,"meanMs":6.9,"p95Ms":7.2}
+summer, kensaku rest           {"calls":73,"triangles":676130,"meanMs":6.9,"p95Ms":7.1}
+ring passage                   {"calls":64,"triangles":840250,"meanMs":6.9,"p95Ms":7.1}
+autumn, explore rest           {"calls":57,"triangles":635742,"meanMs":6.9,"p95Ms":7.7}
+return, start                  {"calls":56,"triangles":635742,"meanMs":6.9,"p95Ms":7.1}
+environment                    {"viewport":{"width":1440,"height":900},"requestedDpr":1,"renderedPixelRatio":1,"emulatedPhone":false,"uncapped":false,"chrome":"158.0.8127.88"}
+
+## after, display-capped --dpr=2
+winter, opening                {"calls":46,"triangles":507038,"meanMs":10.5,"p95Ms":11.2}
+spring, engineering building   {"calls":77,"triangles":643706,"meanMs":7.3,"p95Ms":8.3}
+spring, engineering rest       {"calls":78,"triangles":644058,"meanMs":7.3,"p95Ms":8.9}
+summer, kensaku building       {"calls":71,"triangles":675778,"meanMs":7.6,"p95Ms":8.8}
+summer, kensaku rest           {"calls":73,"triangles":676130,"meanMs":7.9,"p95Ms":9}
+ring passage                   {"calls":64,"triangles":840250,"meanMs":8.4,"p95Ms":9}
+autumn, explore rest           {"calls":57,"triangles":635742,"meanMs":7.5,"p95Ms":9.8}
+return, start                  {"calls":56,"triangles":635742,"meanMs":6.9,"p95Ms":8.2}
+environment                    {"viewport":{"width":1440,"height":900},"requestedDpr":2,"renderedPixelRatio":1.5,"emulatedPhone":false,"uncapped":false,"chrome":"158.0.8127.88"}
+
+## after, display-capped --phone
+winter, opening                {"calls":46,"triangles":507024,"meanMs":6.9,"p95Ms":7.6}
+spring, engineering building   {"calls":69,"triangles":373530,"meanMs":6.9,"p95Ms":7.1}
+spring, engineering rest       {"calls":70,"triangles":373882,"meanMs":6.9,"p95Ms":7.1}
+summer, kensaku building       {"calls":63,"triangles":405602,"meanMs":6.9,"p95Ms":7.2}
+summer, kensaku rest           {"calls":64,"triangles":405954,"meanMs":6.9,"p95Ms":7.1}
+ring passage                   {"calls":56,"triangles":570074,"meanMs":6.9,"p95Ms":7.1}
+autumn, explore rest           {"calls":49,"triangles":365566,"meanMs":6.9,"p95Ms":7.1}
+return, start                  {"calls":48,"triangles":365566,"meanMs":6.9,"p95Ms":7.7}
+environment                    {"viewport":{"width":390,"height":844},"requestedDpr":3,"renderedPixelRatio":1.75,"emulatedPhone":true,"uncapped":false,"chrome":"158.0.8127.88"}

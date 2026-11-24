@@ -1,0 +1,43 @@
+## before (commit 2345a43), DPR 1
+entrance                   {"frames":490,"mean":7.1,"p50":6.9,"p95":7.8,"p99":8.6,"max":93.9,"over33ms":1,"calls":46,"triangles":507038,"slowAt":["0.000 (94 ms)"]}
+environment                {"chrome":"158.0.8127.88","headless":false,"viewport":{"width":1440,"height":900},"dpr":1,"canvas":[1440,900],"sceneVisibleAfterMs":407}
+rest, 3 s                  {"frames":432,"mean":6.9,"p50":6.9,"p95":7.4,"p99":8.2,"max":8.6,"over33ms":0,"calls":46,"triangles":507038}
+lap 1, downward            {"frames":2884,"mean":6.9,"p50":6.9,"p95":8.2,"p99":8.6,"max":14.3,"over33ms":0,"calls":56,"triangles":649910}
+lap 2, downward            {"frames":2882,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.6,"max":9.3,"over33ms":0,"calls":46,"triangles":507038}
+one lap upward             {"frames":2855,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.7,"max":9.2,"over33ms":0,"calls":46,"triangles":507038}
+resources                  {"programs":[44,44],"geometries":[77,77],"textures":[26,26],"requests":11,"heapMB":29,"rebases":3}
+
+## after, DPR 1
+entrance                   {"frames":489,"mean":7,"p50":6.9,"p95":7.7,"p99":8.5,"max":12.7,"over33ms":0,"calls":46,"triangles":507038}
+environment                {"chrome":"158.0.8127.88","headless":false,"viewport":{"width":1440,"height":900},"dpr":1,"canvas":[1440,900],"sceneVisibleAfterMs":453}
+loading                    [{"name":"Engine-BQ04VV19.js","kb":229,"ms":171},{"name":"exhibits.glb","kb":2053,"ms":280},{"name":"landscape.glb","kb":1213,"ms":276},{"name":"landmark.glb","kb":930,"ms":275},{"name":"terrain.glb","kb":1896,"ms":279},{"name":"foliage.png","kb":177,"ms":274},{"name":"stone-detail.png","kb":175,"ms":278},{"name":"particles.bin","kb":422,"ms":353}]
+rest, 3 s                  {"frames":433,"mean":6.9,"p50":6.9,"p95":7.6,"p99":8.2,"max":8.5,"over33ms":0,"calls":46,"triangles":507038}
+lap 1, downward            {"frames":2848,"mean":6.9,"p50":6.9,"p95":8.2,"p99":8.6,"max":9.4,"over33ms":0,"calls":56,"triangles":649910}
+lap 2, downward            {"frames":2862,"mean":7,"p50":6.9,"p95":8.2,"p99":8.5,"max":37.9,"over33ms":1,"calls":46,"triangles":507038,"slowAt":["2.514 (38 ms)"]}
+one lap upward             {"frames":2839,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.6,"max":9.3,"over33ms":0,"calls":46,"triangles":507038}
+resources                  {"programs":[47,47],"geometries":[99,99],"textures":[29,29],"requests":15,"heapMB":44,"rebases":3}
+
+## before, DPR 2 requested
+entrance                   {"frames":389,"mean":9.1,"p50":8.8,"p95":9.8,"p99":11,"max":145.3,"over33ms":1,"calls":46,"triangles":507038,"slowAt":["0.000 (145 ms)"]}
+environment                {"chrome":"158.0.8127.88","headless":false,"viewport":{"width":1440,"height":900},"dpr":1.5,"canvas":[1440,900],"sceneVisibleAfterMs":290}
+rest, 3 s                  {"frames":351,"mean":8.6,"p50":8.7,"p95":9.5,"p99":10.3,"max":10.5,"over33ms":0,"calls":46,"triangles":507038}
+lap 1, downward            {"frames":2764,"mean":7.6,"p50":7.3,"p95":9.6,"p99":10.3,"max":32.2,"over33ms":0,"calls":46,"triangles":507038}
+lap 2, downward            {"frames":2768,"mean":7.6,"p50":7.3,"p95":9.4,"p99":10.3,"max":33.6,"over33ms":1,"calls":46,"triangles":507038,"slowAt":["2.015 (34 ms)"]}
+one lap upward             {"frames":2737,"mean":7.6,"p50":7.2,"p95":9.5,"p99":10.3,"max":34.5,"over33ms":1,"calls":46,"triangles":507038,"slowAt":["1.775 (35 ms)"]}
+
+## after, DPR 2 requested
+entrance                   {"frames":375,"mean":9.3,"p50":8.9,"p95":10.2,"p99":13.4,"max":140.2,"over33ms":1,"calls":46,"triangles":507038,"slowAt":["0.000 (140 ms)"]}
+environment                {"chrome":"158.0.8127.88","headless":false,"viewport":{"width":1440,"height":900},"dpr":1.5,"canvas":[1440,900],"sceneVisibleAfterMs":329}
+rest, 3 s                  {"frames":343,"mean":8.8,"p50":8.8,"p95":9.7,"p99":10.1,"max":11.6,"over33ms":0,"calls":46,"triangles":507038}
+lap 1, downward            {"frames":2746,"mean":8,"p50":7.7,"p95":10.1,"p99":11.2,"max":35.9,"over33ms":2,"calls":46,"triangles":507038,"slowAt":["0.378 (34 ms)","0.625 (36 ms)"]}
+lap 2, downward            {"frames":2728,"mean":7.9,"p50":7.8,"p95":10,"p99":10.9,"max":37.7,"over33ms":1,"calls":46,"triangles":507038,"slowAt":["1.775 (38 ms)"]}
+one lap upward             {"frames":2724,"mean":7.9,"p50":7.8,"p95":10,"p99":11.3,"max":40.3,"over33ms":1,"calls":46,"triangles":507038,"slowAt":["1.775 (40 ms)"]}
+
+## shimmer proxy, before
+spring, leaving Engineering    {"meanChange":2.69,"pixelsChangingOver15Percent":"0%"}
+summer, entering the rings     {"meanChange":2.55,"pixelsChangingOver15Percent":"0%"}
+autumn, arriving at Explore    {"meanChange":2.72,"pixelsChangingOver15Percent":"0%"}
+## shimmer proxy, after
+spring, leaving Engineering    {"meanChange":2.61,"pixelsChangingOver15Percent":"0%"}
+summer, entering the rings     {"meanChange":2.52,"pixelsChangingOver15Percent":"0%"}
+autumn, arriving at Explore    {"meanChange":2.59,"pixelsChangingOver15Percent":"0%"}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+# Third-party imagery of igloo.inc. Regenerate with reference/igloo/scripts/.
+reference/igloo/captures/
+
+# Journey recordings are large. Regenerate with tools/record.mjs.
+docs/journey/*.webm
+
+# Downloaded source textures. Regenerate with tools/assets/textures/fetch.mjs.
+tools/assets/textures/cache/

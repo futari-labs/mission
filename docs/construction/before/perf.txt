@@ -1,0 +1,7 @@
+entrance                   {"frames":497,"mean":7.1,"p50":6.9,"p95":7.9,"p99":8.5,"max":69.5,"over33ms":1,"calls":39,"triangles":486750}
+environment                {"chrome":"158.0.8127.88","headless":false,"viewport":{"width":1440,"height":900},"dpr":1,"canvas":[1440,900],"sceneVisibleAfterMs":297}
+rest, 3 s                  {"frames":432,"mean":6.9,"p50":6.9,"p95":7.5,"p99":8.3,"max":8.6,"over33ms":0,"calls":39,"triangles":486750}
+lap 1, downward            {"frames":2617,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.6,"max":9.4,"over33ms":0,"calls":49,"triangles":629622}
+lap 2, downward            {"frames":2595,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.7,"max":9.3,"over33ms":0,"calls":49,"triangles":629622}
+one lap upward             {"frames":2589,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.7,"max":9,"over33ms":0,"calls":39,"triangles":486750}
+resources                  {"programs":[32,32],"geometries":[45,45],"textures":[25,25],"requests":11,"heapMB":27,"rebases":3}
