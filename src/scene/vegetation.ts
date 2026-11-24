@@ -91,7 +91,6 @@ const BANK_VERTEX = /* glsl */ `
 
 const BANK_FRAGMENT = /* glsl */ `
 	uniform mediump sampler2DArray uLand;
-	uniform mediump sampler2DArray uLandNormal;
 	uniform sampler2D uNoise;
 	uniform vec3 uMean[${LAYERS}];
 	uniform vec3 uRock, uGrass, uGround, uLeafA, uLeafB;
@@ -107,9 +106,13 @@ const BANK_FRAGMENT = /* glsl */ `
 		float l = dot(rel, vec3(0.3, 0.5, 0.2));
 		return want * mix(vec3(l), rel, keep);
 	}
-	vec2 bump(vec2 uv, int layer) {
-		return texture(uLandNormal, vec3(uv, float(layer))).xy * 2.0 - 1.0;
-	}
+	#ifdef FINE
+		// the relief is read only here, so a build without it never loads the texture
+		uniform mediump sampler2DArray uLandNormal;
+		vec2 bump(vec2 uv, int layer) {
+			return texture(uLandNormal, vec3(uv, float(layer))).xy * 2.0 - 1.0;
+		}
+	#endif
 	void main() {
 		vec3 n = normalize(vNormal);
 		vec3 p = vLand;
@@ -182,7 +185,9 @@ const WOOD_VERTEX = /* glsl */ `
 
 const WOOD_FRAGMENT = /* glsl */ `
 	uniform mediump sampler2DArray uLand;
-	uniform mediump sampler2DArray uLandNormal;
+	#ifdef FINE
+		uniform mediump sampler2DArray uLandNormal;
+	#endif
 	uniform vec3 uMean[${LAYERS}];
 	uniform vec3 uBark;
 	uniform float uStem;
@@ -331,25 +336,30 @@ export class Grove {
 	}
 
 	async load(): Promise<void> {
+		// Surface relief costs several texture reads per pixel, which a phone's fill rate should keep.
+		// Without it nothing samples the relief, so it is not fetched, decoded, or uploaded either.
+		const fine = !this.coarse;
 		const [gltf, albedo, normal, foliage] = await Promise.all([
 			loadGlb('/assets/landscape.glb'),
 			loadLayers('/assets/land-albedo.jpg', true),
-			loadLayers('/assets/land-normal.jpg', false),
+			fine ? loadLayers('/assets/land-normal.jpg', false) : null,
 			new THREE.TextureLoader().loadAsync('/assets/foliage.png'),
 		]);
 		foliage.colorSpace = THREE.NoColorSpace;
 		foliage.anisotropy = 4;
 		foliage.flipY = false;
-		this.textures.push(albedo.texture, normal.texture, foliage);
+		this.textures.push(albedo.texture, foliage);
 		this.own.uLand.value = albedo.texture;
-		this.own.uLandNormal.value = normal.texture;
+		if (normal) {
+			this.textures.push(normal.texture);
+			this.own.uLandNormal.value = normal.texture;
+		}
 		this.own.uFoliage.value = foliage;
 		this.own.uMean.value = albedo.mean;
 
 		const extras = gltf.scene.userData as { species: string[]; uvTiles: number; cardReach: number; plants: number[][] };
 		this.defines = { UV_TILES: extras.uvTiles, CARD_REACH: extras.cardReach };
-		// surface relief costs several texture reads per pixel, which a phone's fill rate should keep
-		if (!this.coarse) this.defines.FINE = 1;
+		if (fine) this.defines.FINE = 1;
 		const material = this.material;
 		const meshes = meshesOf(gltf.scene);
 		gltf.scene.updateMatrixWorld(true);

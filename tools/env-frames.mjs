@@ -65,5 +65,7 @@ for (const u of at) {
 	await page.screenshot({ path: path.join(out, `${u.toFixed(4)}.png`), type: 'png' });
 	console.log(u.toFixed(4), JSON.stringify({ calls: s.calls, triangles: s.triangles }));
 }
+const end = await page.evaluate(() => ({ ...window.__futariProbe.stats(), assets: performance.getEntriesByType('resource').filter((r) => r.name.includes('/assets/')).map((r) => `${r.name.split('/').pop()} ${Math.round(r.transferSize / 1024)} kB`) }));
+console.log('resources', JSON.stringify({ programs: end.programs, geometries: end.geometries, textures: end.textures, assets: end.assets }));
 console.log(errors.length ? `errors: ${errors.slice(0, 4).join(' | ')}` : 'no errors');
 await browser.close();
