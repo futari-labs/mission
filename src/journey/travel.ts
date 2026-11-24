@@ -20,6 +20,24 @@ let lastScroll = 0;
 let busyUntil = 0;
 let rebases = 0;
 
+/** An automatic journey to a chapter, for anything that reports on it. Positions are continuous travel, in laps. */
+export interface NavigationState {
+	active: boolean;
+	chapter: ChapterId | null;
+	from: number;
+	to: number;
+	/** Milliseconds since the journey began, and how long it is planned to take in all. */
+	elapsedMs: number;
+	durationMs: number;
+	/** How the last journey ended, and how long it ran. */
+	lastOutcome: 'arrived' | 'interrupted' | 'replaced' | null;
+	lastDurationMs: number;
+}
+
+const navigation: NavigationState = { active: false, chapter: null, from: 0, to: 0, elapsedMs: 0, durationMs: 0, lastOutcome: null, lastDurationMs: 0 };
+
+export const navigationState = (): Readonly<NavigationState> => navigation;
+
 /** CSS height of the scroll spacer. svh, so a phone toolbar that hides while scrolling does not change the lap length. */
 export const trackHeight = `${LAPS * CYCLE * SCREENS_PER_UNIT * 100}svh`;
 

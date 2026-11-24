@@ -2,6 +2,7 @@
 // gather into one of three forms on a stone base, and move away from the pointer.
 import gsap from 'gsap';
 import * as THREE from 'three';
+import { tag } from './experiment.ts';
 import { STATION } from './journey.ts';
 import { look } from './look.ts';
 
@@ -143,7 +144,7 @@ export class Explore {
 		});
 		this.points = new THREE.Points(geometry, material);
 		this.points.frustumCulled = false;
-		this.root.add(this.points);
+		this.root.add(tag(this.points, 'particles'));
 	}
 
 	/** Morphs to another form. Safe to call repeatedly with the same index. */

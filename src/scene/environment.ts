@@ -11,6 +11,7 @@
 // The return moves this whole group along z. Every pattern is therefore placed in the group's own
 // coordinates (world position less `uShift`), so cloud, snow line, and falling leaves move with it.
 import * as THREE from 'three';
+import { tag } from './experiment.ts';
 import { look } from './look.ts';
 import { SKY_GLSL } from './sky.ts';
 import { Grove } from './vegetation.ts';
@@ -219,7 +220,7 @@ export class Environment {
 			const mesh = new THREE.Mesh(ridgeGeometry(i), material);
 			mesh.frustumCulled = false;
 			mesh.renderOrder = -6 + i * -1;
-			this.root.add(mesh);
+			this.root.add(tag(mesh, 'ridges'));
 		});
 		// The banks and groves belong to the growing seasons. In winter the opening's own terrain stands
 		// where they are, so they fade out into the sky and stop being drawn.
@@ -263,11 +264,11 @@ export class Environment {
 			deck.position.set(CENTRE.x, height, CENTRE.z);
 			deck.renderOrder = -4;
 			deck.frustumCulled = false;
-			this.root.add(deck);
+			this.root.add(tag(deck, 'clouds'));
 		}
 		// each bank is a large blended quad, and they overlap toward the horizon: a few is all the frame can afford
-		this.root.add(this.banks(coarse ? 9 : 16));
-		this.snow = this.snowfall(coarse ? 450 : 1000);
+		this.root.add(tag(this.banks(coarse ? 9 : 16), 'clouds'));
+		this.snow = tag(this.snowfall(coarse ? 450 : 1000), 'particles');
 		this.root.add(this.snow);
 	}
 

@@ -1,5 +1,6 @@
 // Depth cues between the layers: drifting snow and slow banks of mist.
 import * as THREE from 'three';
+import { tag } from './experiment.ts';
 
 function valueNoiseTexture(size: number, seed: number): THREE.DataTexture {
 	let s = seed;
@@ -93,7 +94,7 @@ export class Atmosphere {
 		});
 		const points = new THREE.Points(geometry, material);
 		points.frustumCulled = false;
-		return points;
+		return tag(points, 'particles');
 	}
 
 	private bank(x: number, y: number, z: number, w: number, h: number, opacity: number, speed: number): THREE.Mesh {
@@ -121,7 +122,7 @@ export class Atmosphere {
 		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
 		mesh.position.set(x, y, z);
 		mesh.renderOrder = 5;
-		return mesh;
+		return tag(mesh, 'mist');
 	}
 
 	set reveal(v: number) {

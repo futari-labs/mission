@@ -11,6 +11,7 @@
 // attached to the ground when the return moves the world.
 import * as THREE from 'three';
 import { loadGlb, meshesOf } from './assets.ts';
+import { tag } from './experiment.ts';
 import { look } from './look.ts';
 import { SKY_GLSL } from './sky.ts';
 
@@ -354,7 +355,7 @@ export class Grove {
 			// never culled, so every bank reaches the GPU in the warm-up frame and none arrives mid-journey
 			mesh.frustumCulled = false;
 			mesh.renderOrder = -5;
-			this.root.add(mesh);
+			this.root.add(tag(mesh, 'banks'));
 		}
 
 		// A touch device draws the distant mesh of every species, and leaves out a share of the plants.
@@ -381,7 +382,7 @@ export class Grove {
 					if (part === 'cards') keepAlpha(mesh);
 					mesh.frustumCulled = false;
 					mesh.renderOrder = -5;
-					this.root.add(mesh);
+					this.root.add(tag(mesh, part === 'cards' ? 'foliage' : 'wood'));
 				}
 			}
 		});

@@ -9,6 +9,7 @@ import { Atmosphere } from './atmosphere.ts';
 import { Beam } from './beam.ts';
 import { Environment } from './environment.ts';
 import { type ExhibitSet, loadExhibits } from './exhibits.ts';
+import { applyLayerExperiment, experiment, tag } from './experiment.ts';
 import { Explore } from './explore.ts';
 import { emptyPose, emptyState, poseAt, RING_Z, restUnits, STATION, stateAt } from './journey.ts';
 import { Landmark } from './landmark.ts';
@@ -97,15 +98,15 @@ export class Engine {
 		this.canvas = canvas;
 		this.options = options;
 		installFog();
-		this.pixelRatio = Math.min(devicePixelRatio, this.coarse ? 1.75 : 1.5);
+		this.pixelRatio = experiment.dpr ?? Math.min(devicePixelRatio, this.coarse ? 1.75 : 1.5);
 		this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: false });
 		this.renderer.setPixelRatio(this.pixelRatio);
 		this.renderer.toneMapping = THREE.NoToneMapping;
 		this.renderer.info.autoReset = false;
-		this.renderer.shadowMap.enabled = true;
+		this.renderer.shadowMap.enabled = !experiment.off.has('shadows');
 		this.renderer.shadowMap.type = THREE.PCFShadowMap;
 		this.renderer.shadowMap.autoUpdate = false;
-		this.composer = new EffectComposer(this.renderer, { frameBufferType: THREE.HalfFloatType, multisampling: this.coarse ? 2 : 4 });
+		this.composer = new EffectComposer(this.renderer, { frameBufferType: THREE.HalfFloatType, multisampling: experiment.msaa ?? (this.coarse ? 2 : 4) });
 		this.scene.fog = this.fog;
 		this.atmosphere = new Atmosphere(this.fog, this.coarse ? 700 : 1500);
 		this.beam = new Beam(this.coarse ? 260 : 520);
@@ -135,14 +136,22 @@ export class Engine {
 	}
 
 	private buildPipeline(): void {
+		const off = experiment.off;
 		this.composer.addPass(new RenderPass(this.scene, this.camera));
-		this.composer.addPass(new EffectPass(this.camera, this.transition));
+		if (off.has('post')) return;
+		if (!off.has('transition')) this.composer.addPass(new EffectPass(this.camera, this.transition));
 		const bloom = new BloomEffect({ mipmapBlur: true, intensity: look.bloom.intensity, luminanceThreshold: look.bloom.threshold, luminanceSmoothing: look.bloom.smoothing, radius: look.bloom.radius });
 		const grain = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: false });
 		grain.blendMode.opacity.value = look.grain;
 		const vignette = new VignetteEffect({ offset: look.vignette.offset, darkness: look.vignette.darkness });
 		const tone = new ToneMappingEffect({ mode: ToneMappingMode.NEUTRAL ?? ToneMappingMode.AGX });
-		this.composer.addPass(new EffectPass(this.camera, bloom, vignette, tone, grain));
+		if (experiment.bloom !== null) {
+			// the whole bloom chain, from the luminance mask down, at a share of the frame
+			const scale = experiment.bloom;
+			const setSize = bloom.setSize.bind(bloom);
+			bloom.setSize = (width: number, height: number) => setSize(Math.round(width * scale), Math.round(height * scale));
+		}
+		this.composer.addPass(new EffectPass(this.camera, ...(off.has('bloom') ? [] : [bloom]), vignette, tone, grain));
 	}
 
 	private buildLights(): void {
@@ -220,8 +229,9 @@ export class Engine {
 			const [detail] = await Promise.all([loadDetailTexture('/assets/stone-detail.png'), this.landmark.load(), this.terrain.load()]);
 			if (this.disposed) return;
 			stoneUniforms.uDetail.value = detail;
-			this.lab.add(this.terrain.root, this.landmark.root, this.atmosphere.root);
+			this.lab.add(tag(this.terrain.root, 'terrain'), tag(this.landmark.root, 'landmark'), this.atmosphere.root);
 			this.scene.add(this.lab, this.beam.root, this.landmark.lights);
+			applyLayerExperiment(this.scene);
 			this.loaded = true;
 			this.renderer.compile(this.scene, this.camera);
 			this.enter();
@@ -245,8 +255,9 @@ export class Engine {
 			this.explore = explore;
 			const passage = new Passage(exhibits.ringSegment);
 			this.passage = passage;
-			const groups = [exhibits.engineering.root, exhibits.kensaku.root, explore.root, passage.root];
+			const groups = [tag(exhibits.engineering.root, 'exhibits'), tag(exhibits.kensaku.root, 'exhibits'), tag(explore.root, 'explore'), tag(passage.root, 'passage')];
 			this.scene.add(...groups, exhibits.engineering.glow, exhibits.kensaku.glow, explore.lamp);
+			applyLayerExperiment(this.scene);
 			this.warm(groups);
 		} catch (error) {
 			// Their HTML stays readable over fog. Only the 3D of the later chapters is missing.
@@ -354,6 +365,7 @@ export class Engine {
 
 	/** Lowers the pixel ratio when frames stay slow. It never raises it again during a visit. */
 	private govern(dt: number): void {
+		if (!experiment.governor) return;
 		this.slowFrames = dt > 0.024 ? this.slowFrames + 1 : Math.max(0, this.slowFrames - 2);
 		if (this.slowFrames > 90 && this.pixelRatio > 1) {
 			this.pixelRatio = Math.max(1, this.pixelRatio - 0.25);

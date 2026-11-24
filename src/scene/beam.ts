@@ -1,6 +1,7 @@
 // The guiding light: a thin beam from the seam back through every exhibit to the installation,
 // with a slow stream of motes travelling along it.
 import * as THREE from 'three';
+import { tag } from './experiment.ts';
 import { BEAM_Y, STATION } from './journey.ts';
 import { look } from './look.ts';
 
@@ -75,7 +76,7 @@ export class Beam {
 			}),
 		);
 		this.motes.frustumCulled = false;
-		this.root.add(this.line, this.motes);
+		this.root.add(tag(this.line, 'shafts'), tag(this.motes, 'particles'));
 	}
 
 	update(reveal: number, time: number): void {
