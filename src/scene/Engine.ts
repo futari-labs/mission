@@ -482,7 +482,10 @@ export class Engine {
 		tl.to(this.landmark, { lightLevel: 1, duration: 0.9, ease: 'power2.inOut' }, last + 0.07);
 		tl.call(() => this.report('entering'), [], 0);
 		// arriving mid-page, for a capture, or with reduced motion: no entrance to watch
-		if (this.options.still || this.options.reducedMotion || this.units > 0.02) tl.progress(1);
+		// A hair before the start of a lap is the opening too. Scroll positions are whole pixels and a lap
+		// rarely is, so on most phone screens the page rests a fraction of a pixel short of the lap's start.
+		const fromOpening = Math.min(this.units, CYCLE - this.units);
+		if (this.options.still || this.options.reducedMotion || fromOpening > 0.02) tl.progress(1);
 	}
 
 	/** Scrolling during the entrance finishes it fast instead of cutting it, so the camera never snaps. */

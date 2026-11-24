@@ -34,7 +34,8 @@ const take = async (label) => {
 
 const t0 = Date.now();
 await page.goto(`${base}/?probe`);
-await page.waitForFunction(() => window.__futari?.state === 'entering', null, { timeout: 30000 });
+// a build that skips the entrance goes straight to ready
+await page.waitForFunction(() => ['entering', 'ready'].includes(window.__futari?.state), null, { timeout: 30000 });
 const enteringAt = Date.now() - t0;
 await page.evaluate(() => window.__futariProbe.frames.splice(0));
 await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
