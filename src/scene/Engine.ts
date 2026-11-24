@@ -7,6 +7,7 @@ import { CHAPTERS, type ChapterId, CYCLE, chapterAt, chapterOpacity, nearestChap
 import { maintain, readTravel, rebaseCount } from '../journey/travel.ts';
 import { Atmosphere } from './atmosphere.ts';
 import { Beam } from './beam.ts';
+import { Environment } from './environment.ts';
 import { type ExhibitSet, loadExhibits } from './exhibits.ts';
 import { Explore } from './explore.ts';
 import { emptyPose, emptyState, poseAt, RING_Z, restUnits, STATION, stateAt } from './journey.ts';
@@ -42,13 +43,14 @@ export class Engine {
 	private readonly renderer: THREE.WebGLRenderer;
 	private readonly composer: EffectComposer;
 	private readonly scene = new THREE.Scene();
-	private readonly camera = new THREE.PerspectiveCamera(27, 1, 0.3, 1200);
+	private readonly camera = new THREE.PerspectiveCamera(27, 1, 0.3, 2600);
 	private readonly fog = new THREE.FogExp2(look.fog.color, look.fog.density);
 	private readonly lab = new THREE.Group();
 	private readonly landmark = new Landmark();
 	private readonly terrain = new Terrain();
 	private readonly atmosphere: Atmosphere;
 	private readonly beam: Beam;
+	private readonly environment: Environment;
 	private readonly transition: TransitionEffect;
 	private exhibits: ExhibitSet | null = null;
 	private explore: Explore | null = null;
@@ -103,6 +105,9 @@ export class Engine {
 		this.scene.fog = this.fog;
 		this.atmosphere = new Atmosphere(this.fog, this.coarse ? 700 : 1500);
 		this.beam = new Beam(this.coarse ? 260 : 520);
+		// present from the first frame and never hidden, so it is compiled with the opening
+		this.environment = new Environment(this.fog, this.coarse);
+		this.scene.add(this.environment.root);
 		this.transition = new TransitionEffect(this.fog.color);
 		this.travel = this.origin = readTravel();
 		this.units = unitsOf(this.travel);
@@ -421,6 +426,8 @@ export class Engine {
 			this.atmosphere.update(time);
 		} else this.landmark.dark();
 		this.beam.update(s.beam * this.landmark.lightLevel, time);
+		// the travelling snow yields to the opening's own snow while that is on screen
+		this.environment.update(time, s.worldShift, s.worldVeil, s.lab ? 1 - 0.75 * this.intro.snow * s.snow : 1);
 		const pointer = follow ? this.pointer : null;
 		if (this.exhibits) {
 			this.exhibits.engineering.visible = s.engineering;
@@ -457,6 +464,7 @@ export class Engine {
 		this.terrain.dispose();
 		this.atmosphere.dispose();
 		this.beam.dispose();
+		this.environment.dispose();
 		this.passage?.dispose();
 		this.exhibits?.dispose();
 		this.explore?.dispose();

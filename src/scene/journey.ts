@@ -64,6 +64,9 @@ export interface JourneyState {
 	passage: boolean;
 	ringVeil: number;
 	rings: [number, number, number];
+	/** Where the distant environment is drawn along z, and how hidden in the sky it is. See the return. */
+	worldShift: number;
+	worldVeil: number;
 }
 
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -198,12 +201,19 @@ export function stateAt(u: number, cameraZ: number, reducedMotion: boolean, out:
 	out.passage = false;
 	out.ringVeil = 1;
 	out.rings[0] = out.rings[1] = out.rings[2] = 1;
+	out.worldShift = 0;
+	out.worldVeil = 0;
 
 	if (u > RETURN_FROM) {
 		// The return is set from the position alone. Nothing here may depend on where the camera is,
 		// because the camera is back in the opening landscape while the installation is still in view.
 		const t = span(u, RETURN_FROM, CYCLE);
 		out.shift = RETURN_SHIFT;
+		// The distant ridges and clouds move with the installation when the return begins, so nothing
+		// jumps. They are hidden in the thick snow of the middle of the return, moved back to their
+		// own place while hidden, and come out again with the opening landscape.
+		out.worldShift = t < 0.42 ? RETURN_SHIFT : 0;
+		out.worldVeil = step(t, 0.03, 0.27) * (1 - step(t, 0.56, 0.9));
 		out.gate = 0;
 		out.beam = 0;
 		out.white = 0;
@@ -265,5 +275,6 @@ export const emptyState = (): JourneyState => ({
 	lab: true, engineering: false, kensaku: false, explore: false,
 	gather: 0, stream: 0, stage: false, disperse: 0, recede: 0, snow: 1, shift: 0,
 	engineeringBuild: 1, engineeringShell: 1, kensakuBuild: 1, kensakuShell: 1, passage: false, ringVeil: 1, rings: [1, 1, 1],
+	worldShift: 0, worldVeil: 0,
 });
 export const emptyPose = (): Pose => ({ position: new THREE.Vector3(), target: new THREE.Vector3(), fov: 27 });

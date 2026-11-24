@@ -2,13 +2,22 @@
 // so distant ridges dissolve into the gradient instead of into one flat color.
 import * as THREE from 'three';
 
-const SKY_GLSL = /* glsl */ `
+/**
+ * The colour of the sky in a direction. Fog, distant ridges, and clouds all fade to this same
+ * function, so anything far away dissolves into exactly the sky that is behind it.
+ * A cool blue-grey overhead, a paler horizon with a little ivory, a broad soft light ahead and to
+ * the right, and a slightly deeper tone below the horizon where the cloud sea lies.
+ */
+export const SKY_GLSL = /* glsl */ `
 vec3 futariSky(vec3 d, vec3 base) {
-	float up = clamp(d.y * 2.2 + 0.08, 0.0, 1.0);
-	vec3 c = mix(base, base * vec3(1.13, 1.135, 1.14) + vec3(0.035), smoothstep(0.0, 1.0, up));
-	float glow = pow(max(dot(d, normalize(vec3(0.55, 0.3, -0.78))), 0.0), 5.0);
-	c += vec3(0.085, 0.09, 0.1) * glow;
-	c *= 1.0 - 0.1 * smoothstep(0.0, -0.35, d.y);
+	vec3 horizon = base * vec3(1.17, 1.155, 1.1) + vec3(0.05, 0.046, 0.03);
+	vec3 zenith = base * vec3(0.7, 0.77, 0.94);
+	vec3 below = base * vec3(0.84, 0.88, 0.98);
+	// the change happens low in the sky, inside the band a level camera actually sees
+	vec3 c = mix(horizon, zenith, smoothstep(0.01, 0.3, d.y));
+	c = mix(c, below, smoothstep(0.0, -0.22, d.y));
+	float toward = max(dot(d, normalize(vec3(0.55, 0.22, -0.8))), 0.0);
+	c += vec3(0.1, 0.096, 0.082) * pow(toward, 3.0) + vec3(0.05, 0.05, 0.046) * pow(toward, 14.0);
 	return c;
 }`;
 

@@ -1,6 +1,6 @@
 // Every tunable of the opening scene in one place: palette, fog, lights, camera keyframes, motion.
 export const look = {
-	fog: { color: '#a3a8b6', density: 0.0088, introDensity: 0.05, voidDensity: 0.026, returnDensity: 0.05 },
+	fog: { color: '#a3a8b6', density: 0.0088, introDensity: 0.05, voidDensity: 0.015, returnDensity: 0.05 },
 	stone: { dark: '#535966', light: '#858b99', frost: '#ccd3de' },
 	ground: { rockDark: '#4c525f', rockLight: '#7b8291', snow: '#aeb4c2' },
 	lights: {
@@ -29,6 +29,19 @@ export const look = {
 	particles: { size: 0.034, color: '#8b93a6', hot: '#f2f6ff', spin: 0.23 },
 	beam: { radius: 0.013, brightness: 2.6 },
 	passage: { joint: 2.4, rim: 3.2 },
+	// The world beyond the opening: ridges at three depths, and a sea of clouds below the journey.
+	environment: {
+		rock: '#474e5d',
+		snow: '#c4cbd8',
+		/** Per ridge band, near to far: distance, width, peak height, and how much it has faded into the sky. */
+		ridges: [
+			{ radius: 360, width: 150, height: 54, haze: 0.2 },
+			{ radius: 640, width: 230, height: 112, haze: 0.4 },
+			{ radius: 1020, width: 330, height: 205, haze: 0.6 },
+		],
+		cloudTop: -20,
+		cloudOpacity: 0.94,
+	},
 } as const;
 
 export type Vec3Tuple = readonly [number, number, number];
