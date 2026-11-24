@@ -1,7 +1,7 @@
 import { type FocusEvent, type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { mark } from './content/mark.ts';
 import { site } from './content/site.ts';
-import { type ChapterId, CYCLE, chapterAt, unitsOf } from './journey/chapters.ts';
+import { CHAPTERS, type ChapterId, CYCLE, chapterAt, RETURN_FROM, unitsOf } from './journey/chapters.ts';
 import { goToChapter, initTravel, lapPixels, placeTravel, readTravel, trackHeight } from './journey/travel.ts';
 import type { Engine, EngineState } from './scene/Engine.ts';
 
@@ -18,6 +18,8 @@ declare global {
 			/** Jumps to a position in journey units. */
 			jump: (units: number) => void;
 			unitPixels: () => number;
+			/** The lap as the tools need it: its length, where the return starts, and each chapter's rest. */
+			map: { cycle: number; returnFrom: number; rests: Record<ChapterId, number> };
 		};
 	}
 }
@@ -71,6 +73,7 @@ export function App() {
 				units: () => readTravel() * CYCLE,
 				jump: (units) => placeTravel(units / CYCLE),
 				unitPixels: () => lapPixels() / CYCLE,
+				map: { cycle: CYCLE, returnFrom: RETURN_FROM, rests: Object.fromEntries(CHAPTERS.map((c) => [c.id, c.rest])) as Record<ChapterId, number> },
 			});
 		const report = (next: Phase) => {
 			if (cancelled) return;

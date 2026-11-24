@@ -9,7 +9,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)));
 const reset = () => page.evaluate(() => { window.__futariProbe.frames.length = 0; window.__futariProbe.camera.length = 0; window.__futariProbe.shift.length = 0; });
-const state = () => page.evaluate(() => ({ state: window.__futari.state, chapter: window.__futari.chapter, position: +(window.__futariProbe.stats().travel * 1.16).toFixed(4), goal: +window.__futari.units().toFixed(4) }));
+const state = () => page.evaluate(() => ({ state: window.__futari.state, chapter: window.__futari.chapter, position: +(window.__futariProbe.stats().travel * window.__futari.map.cycle).toFixed(4), goal: +window.__futari.units().toFixed(4) }));
 // largest camera movement between two consecutive frames, in metres, and the frame interval at that moment
 const jumps = () => page.evaluate(() => {
 	const c = window.__futariProbe.camera, f = window.__futariProbe.frames, sh = window.__futariProbe.shift;
@@ -40,23 +40,27 @@ await page.waitForTimeout(1800);
 await report('scroll during entrance');
 
 const m = await max();
-await reset(); await wheel(m * 0.17, 900); await page.waitForTimeout(250);
-await report('forward into transition 1');
-await reset(); await wheel(-m * 0.1, 900); await page.waitForTimeout(1200);
-await report('reverse inside transition 1');
-await reset(); await wheel(m * 0.34, 2400); await page.waitForTimeout(1500);
-await report('fast forward to kensaku');
-await reset(); await wheel(-m * 0.06, 900); await page.waitForTimeout(1200);
-await report('reverse inside transition 2');
-await reset(); await wheel(m * 0.22, 900); await wheel(-m * 0.08, 900); await page.waitForTimeout(1500);
-await report('reverse inside passage');
+// each scenario stops and reverses halfway through one construction
+const go = async (u) => { const now = await page.evaluate(() => window.__futari.units()); await wheel(m * (u - now), 900); };
+await reset(); await go(0.3); await page.waitForTimeout(700);
+await report('forward, engineering half built');
+await reset(); await go(0.22); await go(0.34); await page.waitForTimeout(1000);
+await report('reverse and resume, engineering');
+await reset(); await wheel(m * 0.22, 2400); await page.waitForTimeout(1500);
+await report('fast forward into kensaku build');
+await reset(); await go(0.52); await go(0.6); await page.waitForTimeout(1000);
+await report('reverse and resume, kensaku');
+await reset(); await go(0.82); await page.waitForTimeout(700);
+await report('forward, inside ring passage');
+await reset(); await go(0.75); await go(0.9); await page.waitForTimeout(1000);
+await report('reverse and resume, ring passage');
 await reset(); await page.click('nav.chapters a[href="#explore"]'); await page.waitForTimeout(3500);
 await report('nav click: explore');
 await reset(); await page.click('nav.chapters a[href="#lab"]'); await page.waitForTimeout(4500);
 await report('nav click: lab');
 
 // reload mid-page: the browser restores the scroll position, and the scene must resolve to it
-await page.evaluate(() => window.__futari.jump(0.59));
+await page.evaluate(() => window.__futari.jump(window.__futari.map.rests.kensaku));
 await page.waitForTimeout(600);
 await page.reload();
 await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });

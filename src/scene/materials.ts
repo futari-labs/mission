@@ -58,6 +58,7 @@ const FRAGMENT_PARS = /* glsl */ `
 uniform sampler2D uDetail;
 uniform float uLoosen;
 uniform float uJoint;
+uniform float uVeil;
 uniform vec3 uJointColor;
 uniform vec3 uColA;
 uniform vec3 uColB;
@@ -110,7 +111,18 @@ fO2 *= mix(1.9, 1.0, fSnow);`;
 
 export type StoneKind = 'landmark' | 'terrain';
 
-export function createStoneMaterial(kind: StoneKind): THREE.MeshStandardMaterial {
+/** Uniforms a single material may own instead of sharing the landmark's. */
+export interface StoneOverrides {
+	/** 1 uses the mesh's own occlusion, 0 the occlusion baked with its neighbours in place. */
+	uLoosen?: { value: number };
+	uJoint?: { value: number };
+	/** 1 hides the mesh in the fog behind it. */
+	uVeil?: { value: number };
+}
+
+const NO_VEIL = { value: 0 };
+
+export function createStoneMaterial(kind: StoneKind, own: StoneOverrides = {}): THREE.MeshStandardMaterial {
 	const material = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9, metalness: 0 });
 	const stone = kind === 'landmark';
 	const colors = stone
@@ -120,8 +132,9 @@ export function createStoneMaterial(kind: StoneKind): THREE.MeshStandardMaterial
 	material.customProgramCacheKey = () => `futari-stone-${kind}`;
 	material.onBeforeCompile = (shader) => {
 		shader.uniforms.uDetail = stoneUniforms.uDetail;
-		shader.uniforms.uLoosen = stoneUniforms.uLoosen;
-		shader.uniforms.uJoint = stoneUniforms.uJoint;
+		shader.uniforms.uLoosen = own.uLoosen ?? stoneUniforms.uLoosen;
+		shader.uniforms.uJoint = own.uJoint ?? stoneUniforms.uJoint;
+		shader.uniforms.uVeil = own.uVeil ?? NO_VEIL;
 		shader.uniforms.uJointColor = stoneUniforms.uJointColor;
 		shader.uniforms.uColA = { value: new THREE.Color(colors[0]) };
 		shader.uniforms.uColB = { value: new THREE.Color(colors[1]) };
@@ -139,6 +152,7 @@ export function createStoneMaterial(kind: StoneKind): THREE.MeshStandardMaterial
 			)
 			// light inside the joints: the bake marks where, the landmark sets how bright
 			.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${stone ? 'totalEmissiveRadiance += uJointColor * (uJoint * smoothstep(0.22, 0.95, vBake.a));' : ''}`)
+			.replace('#include <fog_fragment>', '#include <fog_fragment>\n#ifdef USE_FOG\ngl_FragColor.rgb = mix(gl_FragColor.rgb, futariSky(fogVec / max(fogDist, 1e-4), fogColor), uVeil);\n#endif')
 			.replace(
 				'#include <aomap_fragment>',
 				'#include <aomap_fragment>\nreflectedLight.indirectDiffuse *= fAo;\nreflectedLight.indirectSpecular *= fAo;\nreflectedLight.directDiffuse *= mix(1.0, fAo, 0.5);',

@@ -9,8 +9,10 @@ export const BEAM_Y = 3.15;
 export const STATION = {
 	engineering: new THREE.Vector3(0, BEAM_Y, -60),
 	kensaku: new THREE.Vector3(0, BEAM_Y, -110),
-	explore: new THREE.Vector3(0, BEAM_Y, -165),
+	explore: new THREE.Vector3(0, BEAM_Y, -190),
 };
+/** Where the three passage rings stand on the line of the light, between Kensaku and the installation. */
+export const RING_Z = [STATION.kensaku.z - 16, STATION.kensaku.z - 31, STATION.kensaku.z - 46];
 
 /**
  * The exhibits and the installation stand in open fog, so where they are in the world is free.
@@ -53,12 +55,25 @@ export interface JourneyState {
 	snow: number;
 	/** How far along z the installation is drawn from its station. See RETURN_SHIFT. */
 	shift: number;
+	/** Assembly of each exhibit's parts, 0 scattered to 1 seated, and of its enclosure. */
+	engineeringBuild: number;
+	engineeringShell: number;
+	kensakuBuild: number;
+	kensakuShell: number;
+	/** The passage rings: whether they render, how hidden in fog they are, and how far each has assembled. */
+	passage: boolean;
+	ringVeil: number;
+	rings: [number, number, number];
 }
 
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
-const ease = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+// clamped: rounding can put the polynomial a hair above 1, and a curve has no point past its end
+const ease = (t: number) => Math.min(1, Math.max(0, t * t * t * (t * (t * 6 - 15) + 10)));
 const span = (p: number, a: number, b: number) => THREE.MathUtils.clamp((p - a) / (b - a), 0, 1);
 const step = THREE.MathUtils.smoothstep;
+
+/** Where each chapter's camera rest begins and ends, in journey units. The moves fill the gaps. */
+const T = { engineering: [0.36, 0.48], kensaku: [0.6, 0.72], explore: 0.94 } as const;
 
 interface Framing {
 	hero: [THREE.Vector3, THREE.Vector3];
@@ -112,10 +127,10 @@ function buildPaths(f: Framing): Paths {
 			curve(f.engineering[0], v(-4.1, BEAM_Y + 0.5, E.z + 1.5), v(-1.6, BEAM_Y + 0.2, E.z - 20), f.kensaku[0]),
 			curve(f.engineering[1], v(0, BEAM_Y, E.z - 16), v(-0.2, BEAM_Y - 0.2, K.z + 6), f.kensaku[1]),
 		],
-		// beside the lens, up over the beam, and down to the installation
+		// beside the lens, onto the line of the light, and through the middle of each ring in turn
 		toExplore: [
-			curve(f.kensaku[0], v(4.3, BEAM_Y + 0.6, K.z - 0.5), v(1.4, BEAM_Y + 3.6, K.z - 27), f.explore[0]),
-			curve(f.kensaku[1], v(0, BEAM_Y, K.z - 22), v(0, BEAM_Y - 0.9, X.z + 2), f.explore[1]),
+			curve(f.kensaku[0], v(4.4, BEAM_Y + 0.5, K.z - 1), v(1.7, BEAM_Y + 0.45, K.z - 9), v(0.18, BEAM_Y + 0.32, RING_Z[0]), v(-0.26, BEAM_Y + 0.46, RING_Z[1]), v(0.14, BEAM_Y + 0.3, RING_Z[2]), f.explore[0]),
+			curve(f.kensaku[1], v(0.7, BEAM_Y, K.z - 22), v(0, BEAM_Y + 0.1, RING_Z[1] - 9), v(0, BEAM_Y - 0.2, X.z + 7), f.explore[1]),
 		],
 		// the return: forward through the dispersing form, up into the snow, and down to the opening view
 		toLab: [
@@ -139,11 +154,11 @@ function along(paths: Paths, u: number, position: THREE.Vector3, target: THREE.V
 		target.copy(pair[1]);
 	};
 	if (u <= 0.06) rest(f.hero);
-	else if (u < 0.31) use(paths.toEngineering, span(u, 0.06, 0.31));
-	else if (u <= 0.42) rest(f.engineering);
-	else if (u < 0.53) use(paths.toKensaku, span(u, 0.42, 0.53));
-	else if (u <= 0.65) rest(f.kensaku);
-	else if (u < 0.82) use(paths.toExplore, span(u, 0.65, 0.82));
+	else if (u < T.engineering[0]) use(paths.toEngineering, span(u, 0.06, T.engineering[0]));
+	else if (u <= T.engineering[1]) rest(f.engineering);
+	else if (u < T.kensaku[0]) use(paths.toKensaku, span(u, T.engineering[1], T.kensaku[0]));
+	else if (u <= T.kensaku[1]) rest(f.kensaku);
+	else if (u < T.explore) use(paths.toExplore, span(u, T.kensaku[1], T.explore));
 	else if (u <= RETURN_FROM) rest(f.explore);
 	else use(paths.toLab, span(u, RETURN_FROM, CYCLE));
 }
@@ -179,6 +194,10 @@ export function stateAt(u: number, cameraZ: number, reducedMotion: boolean, out:
 	out.recede = 0;
 	out.snow = 1;
 	out.shift = 0;
+	out.engineeringBuild = out.engineeringShell = out.kensakuBuild = out.kensakuShell = 1;
+	out.passage = false;
+	out.ringVeil = 1;
+	out.rings[0] = out.rings[1] = out.rings[2] = 1;
 
 	if (u > RETURN_FROM) {
 		// The return is set from the position alone. Nothing here may depend on where the camera is,
@@ -213,17 +232,31 @@ export function stateAt(u: number, cameraZ: number, reducedMotion: boolean, out:
 	out.beam = reducedMotion ? (u > 0.2 ? 1 : 0) : step(u, 0.05, 0.2);
 	out.fogDensity = THREE.MathUtils.lerp(look.fog.density, look.fog.voidDensity, 1 - step(cameraZ, -22, 0));
 	out.white = still * 0.92 * (1 - step(cameraZ, -1.5, 3.5)) * step(cameraZ, -17, -5.5);
-	const second = Math.sin(Math.PI * span(u, 0.435, 0.52)) ** 1.5;
-	const third = Math.sin(Math.PI * span(u, 0.665, 0.77)) ** 1.5;
-	out.frost = still * Math.max(step(passing, 0, 0.3) * (1 - step(passing, 0.62, 1)), 0.5 * second, 0.45 * third);
-	out.front = second > 0 ? 1.35 - 1.7 * span(u, 0.435, 0.52) : third > 0 ? 1.35 - 1.7 * span(u, 0.665, 0.77) : passing * 2.6 - 0.15;
+	// a light frost pass marks the move to Kensaku. The ring passage has none: the rings are the event.
+	const second = Math.sin(Math.PI * span(u, 0.49, 0.555)) ** 1.5;
+	out.frost = still * Math.max(step(passing, 0, 0.3) * (1 - step(passing, 0.62, 1)), 0.42 * second);
+	out.front = second > 0 ? 1.35 - 1.7 * span(u, 0.49, 0.555) : passing * 2.6 - 0.15;
 	out.lab = cameraZ > -10;
 	out.engineering = cameraZ < 3 && cameraZ > E.z - 22;
 	out.kensaku = cameraZ < E.z + 6 && cameraZ > K.z - 26;
 	out.explore = cameraZ < K.z + 16;
 	out.stage = cameraZ < K.z - 1.5;
-	out.stream = step(u, 0.635, 0.68);
-	out.gather = reducedMotion ? 1 : step(u, 0.7, 0.83);
+	out.stream = step(u, 0.71, 0.76);
+	out.gather = reducedMotion ? 1 : step(u, 0.85, 0.955);
+
+	// Construction is a function of the position alone. Each exhibit builds while the camera approaches
+	// and its enclosure resolves last. Under reduced motion the camera only stands at rests, where all of it is complete.
+	if (!reducedMotion) {
+		out.engineeringBuild = span(u, 0.2, 0.372);
+		out.engineeringShell = step(u, 0.352, 0.4);
+		out.kensakuBuild = span(u, 0.515, 0.607);
+		out.kensakuShell = step(u, 0.592, 0.632);
+		// Each ring assembles as the camera nears it and is closed 7 m before the camera arrives,
+		// so nothing moves across the opening the camera is about to use.
+		out.passage = u > T.kensaku[1] - 0.006 && cameraZ > RING_Z[2] - 6;
+		out.ringVeil = 1 - step(u, T.kensaku[1], T.kensaku[1] + 0.04);
+		for (let i = 0; i < 3; i++) out.rings[i] = 1 - step(cameraZ, RING_Z[i] + 7, RING_Z[i] + 36);
+	}
 	return out;
 }
 
@@ -231,5 +264,6 @@ export const emptyState = (): JourneyState => ({
 	gate: 0, beam: 0, fogDensity: look.fog.density, white: 0, frost: 0, front: 0,
 	lab: true, engineering: false, kensaku: false, explore: false,
 	gather: 0, stream: 0, stage: false, disperse: 0, recede: 0, snow: 1, shift: 0,
+	engineeringBuild: 1, engineeringShell: 1, kensakuBuild: 1, kensakuShell: 1, passage: false, ringVeil: 1, rings: [1, 1, 1],
 });
 export const emptyPose = (): Pose => ({ position: new THREE.Vector3(), target: new THREE.Vector3(), fov: 27 });

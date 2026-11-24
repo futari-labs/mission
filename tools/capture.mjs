@@ -13,7 +13,6 @@ const views = [
 	{ name: 'desktop', width: 1440, height: 900, deviceScaleFactor: 1 },
 	{ name: 'phone', width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
 ];
-const rests = { lab: 0, engineering: 0.365, kensaku: 0.59, explore: 0.9 };
 for (const v of views) {
 	const context = await browser.newContext({ viewport: { width: v.width, height: v.height }, deviceScaleFactor: v.deviceScaleFactor, isMobile: v.isMobile, hasTouch: v.hasTouch });
 	const page = await context.newPage();
@@ -23,6 +22,7 @@ for (const v of views) {
 	await page.goto(`${base}/?still`);
 	await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
 	await page.waitForTimeout(2500);
+	const rests = await page.evaluate(() => window.__futari.map.rests);
 	if (bare) await page.addStyleTag({ content: '.brand,.chapters,.panel,.loader{visibility:hidden}' });
 	for (const [chapter, rest] of Object.entries(rests)) {
 		await page.evaluate((u) => window.__futari.jump(u), rest);

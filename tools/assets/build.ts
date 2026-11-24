@@ -1,7 +1,7 @@
 // Regenerates every runtime asset of the opening scene. Deterministic: same inputs, same bytes.
 // Run with: pnpm assets:build
 import { mkdirSync, statSync, writeFileSync } from 'node:fs';
-import { SHAPES, type Shape } from './exhibits.ts';
+import { assembled, RING, SHAPES, type Shape } from './exhibits.ts';
 import { type BakedMesh, writeGlb } from './glb.ts';
 import { BLOCKS, type Block, LIGHT, outline, sdBlock, sdBlockCoarse, sdLandmarkCoarse } from './landmark.ts';
 import { clamp, makeNoise, mulberry32, smooth } from './noise.ts';
@@ -73,7 +73,9 @@ function bakeBlock(b: Block): BakedMesh {
 	};
 }
 
-// Exhibit shapes use the bridge channels, so they share its material. R and G both hold occlusion.
+// Exhibit parts use the landmark's channels, so they share its material: R occlusion with the whole
+// sculpture assembled, G occlusion of the part alone, B edge wear, A joint light (ring segment only).
+// The runtime blends R and G by how far a part is from its seat, so no neighbour's shadow stays on a part that has moved away.
 function bakeShape(shape: Shape): BakedMesh {
 	const { positions, indices } = surfaceNets(shape.fine, shape.min, shape.max, shape.cell);
 	const count = positions.length / 3;
@@ -82,6 +84,7 @@ function bakeShape(shape: Shape): BakedMesh {
 	const bake = new Uint8Array(count * 4);
 	const f = shape.fine;
 	const g = shape.coarse;
+	const whole = shape.motion ? assembled(shape.group) : g;
 	for (let i = 0; i < count; i++) {
 		let p: Vec3 = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
 		let n = gradient(f, p[0], p[1], p[2], 0.008);
@@ -92,12 +95,14 @@ function bakeShape(shape: Shape): BakedMesh {
 		normals.set(n, i * 3);
 		const e = 0.05;
 		const lap = (g(p[0] + e, p[1], p[2]) + g(p[0] - e, p[1], p[2]) + g(p[0], p[1] + e, p[2]) + g(p[0], p[1] - e, p[2]) + g(p[0], p[1], p[2] + e) + g(p[0], p[1], p[2] - e) - 6 * g(p[0], p[1], p[2])) / e;
-		const ao = occlusion(g, p, n, 0.4);
-		bake.set([byte(ao), byte(ao), byte(0.5 + lap * 0.55), 0], i * 4);
+		bake.set([byte(occlusion(whole, p, n, 0.4)), byte(occlusion(g, p, n, 0.4)), byte(0.5 + lap * 0.55), byte(shape.glow ? shape.glow(p[0], p[1], p[2]) : 0)], i * 4);
 	}
 	const idx = new Uint32Array(indices);
 	orient(idx, pos, normals);
-	return { name: shape.name, positions: pos, normals, bake, indices: idx };
+	const r3 = (v: number[]) => v.map((x) => +x.toFixed(3));
+	const pivot = [(shape.min[0] + shape.max[0]) / 2, (shape.min[1] + shape.max[1]) / 2, (shape.min[2] + shape.max[2]) / 2];
+	const extras = shape.motion ? { group: shape.group, pivot: r3(pivot), from: shape.motion.from, axis: shape.motion.axis, angle: shape.motion.angle, window: shape.motion.window } : shape.group === 'ring' ? { ring: RING } : undefined;
+	return { name: shape.name, positions: pos, normals, bake, indices: idx, extras };
 }
 
 function orient(idx: Uint32Array, pos: Float32Array, normals: Float32Array): void {
@@ -224,7 +229,8 @@ await writeGlb(`${OUT}/exhibits.glb`, shapes);
 
 // Particle targets for the final installation: 3 forms of PARTICLES points, 16-bit, in a volume of +-3.
 const PARTICLES = 24000;
-const shape = (name: string) => shapes.filter((m) => m.name === name);
+// each form is the whole sculpture in its assembled pose: every part of that group
+const shape = (group: string) => shapes.filter((_, i) => SHAPES[i].group === group);
 const forms = [
 	// 二人 again: only the front and back faces, flattened in depth, so the strokes stay crisp at any particle count
 	samplePoints(blocks, PARTICLES, 5, [0, 2.75, 0], [0.285, 0.285, 0.13], (y, nz) => y > 0.05 && Math.abs(nz) > 0.7),
@@ -244,7 +250,8 @@ const report = {
 	landmarkBytes: statSync(`${OUT}/landmark.glb`).size,
 	terrainBytes: statSync(`${OUT}/terrain.glb`).size,
 	detailBytes: statSync(`${OUT}/stone-detail.png`).size,
-	exhibits: Object.fromEntries(shapes.map((m) => [m.name, m.indices.length / 3])),
+	exhibitParts: shapes.length,
+	exhibitTriangles: Object.fromEntries(['engineering', 'kensaku', 'shell', 'base', 'ring'].map((g) => [g, shapes.reduce((n, m, i) => n + (SHAPES[i].group === g ? m.indices.length / 3 : 0), 0)])),
 	exhibitsBytes: statSync(`${OUT}/exhibits.glb`).size,
 	particlesBytes: statSync(`${OUT}/particles.bin`).size,
 	seconds: (Date.now() - t0) / 1000,

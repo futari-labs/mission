@@ -42,18 +42,20 @@ Without WebGL the spacer is hidden and the page is a plain finite document.
 
 ## Sequence
 
-Positions are journey units. One lap is 1.16 units, about 9.9 screens of scrolling.
+Positions are journey units. One lap is 1.28 units, about 10.9 screens of scrolling.
 
 | Position | What happens |
 | --- | --- |
 | 0.00 to 0.06 | The lab at rest. |
-| 0.06 to 0.31 | One continuous camera move: toward the light, between 二 and 人, along the beam to Exhibit 01. Each character slides aside as a whole as the camera nears. The beam extends ahead. A frost front rises with block displacement and a color fringe, the view whites out inside the light, and clears into fog. |
-| 0.31 to 0.42 | Futari Engineering at rest. |
-| 0.42 to 0.53 | The camera passes beside the first enclosure and follows the beam to Kensaku. A lighter frost pass marks the midpoint. |
-| 0.53 to 0.65 | Kensaku at rest. |
-| 0.65 to 0.82 | Particles leave the lens along the beam. The camera follows, rises, and settles in front of the installation as the particles gather. |
-| 0.82 to 0.98 | Explore further at rest. Links select the particle form. |
-| 0.98 to 1.16 | The return. See below. Position 1.16 is position 0 of the next lap. |
+| 0.06 to 0.36 | One continuous camera move: toward the light, between 二 and 人, along the beam to Exhibit 01. Each character slides aside as a whole. A frost front rises with block displacement and a color fringe, the view whites out inside the light, and clears into fog. From 0.20 the Engineering sculpture builds ahead of the camera, part by part. Its enclosure resolves from 0.35. |
+| 0.36 to 0.48 | Futari Engineering at rest. |
+| 0.48 to 0.60 | The camera passes beside the first enclosure and follows the beam. Kensaku's parts align from 0.515, and its enclosure resolves from 0.59. |
+| 0.60 to 0.72 | Kensaku at rest. |
+| 0.72 to 0.94 | The ring passage. The camera passes beside the lens, joins the line of the light, and goes through three stone rings that assemble ahead of it. Particles leave the lens along the beam and gather at the installation. |
+| 0.94 to 1.10 | Explore further at rest. Links select the particle form. |
+| 1.10 to 1.28 | The return. See below. Position 1.28 is position 0 of the next lap. |
+
+`docs/construction/README.md` describes the construction and the ring passage.
 
 The entrance is time-based and runs once per page load. If scrolling starts during it, it finishes at
 3.5 times speed instead of jumping. Later laps arrive at the finished landmark.

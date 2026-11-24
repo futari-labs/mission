@@ -2,7 +2,7 @@
 
 The Futari Labs website. An immersive 3D site built with React, TypeScript, three.js, and GSAP.
 
-The site is one looping scroll journey: the 二人 landmark, Futari Engineering, Kensaku, a particle installation with links, and a return to the landmark. Scrolling down never reaches an end. `docs/journey.md` describes the sequence and how the transitions work. `docs/identity/README.md` describes the 二人 identity.
+The site is one looping scroll journey: the 二人 landmark, Futari Engineering, Kensaku, a particle installation with links, and a return to the landmark. Scrolling down never reaches an end. `docs/journey.md` describes the sequence and how the transitions work. `docs/identity/README.md` describes the 二人 identity, and `docs/construction/README.md` the construction sequences and the ring passage.
 
 ## Run it
 
@@ -33,7 +33,7 @@ The command takes about 18 seconds and rewrites every file in `public/assets/`. 
 | The 二人 landmark: scale, spacing, joints, chips | `tools/assets/landmark.ts` |
 | The glyph outlines, header mark, and favicon | `tools/assets/glyphs/` (see `SOURCE.md`) |
 | Landscape: platform, foreground ridge, mountains | `tools/assets/terrain-fn.ts` |
-| The two exhibits, their enclosures, and the installation base | `tools/assets/exhibits.ts` |
+| The exhibits' parts and their start poses, the enclosures, the installation base, the ring segment | `tools/assets/exhibits.ts` |
 | What gets baked into each vertex, and the particle targets | `tools/assets/build.ts` |
 
 ## Change the look
@@ -44,7 +44,8 @@ The command takes about 18 seconds and rewrites every file in `public/assets/`. 
 | Colors, fog, lights, bloom, opening camera, pointer and entrance timing | `src/scene/look.ts` |
 | Chapter ranges, lap length, and where navigation lands | `src/journey/chapters.ts` |
 | Scroll position, looping, restore, and resize | `src/journey/travel.ts` |
-| Camera path and everything derived from scroll progress | `src/scene/journey.ts` |
+| Camera path, construction timing, and everything derived from scroll position | `src/scene/journey.ts` |
+| The three rings: size, angle, and how segments scatter | `src/scene/passage.ts` |
 | Frost, displacement, color fringe, white-out | `src/scene/transition.ts` |
 | Stone, frost, and snow shading | `src/scene/materials.ts` |
 | Sky gradient and fog falloff | `src/scene/sky.ts` |

@@ -29,7 +29,7 @@ const step = (viewport.height * 0.8) / 60;
 for (let y = a * unit; dir > 0 ? y <= b * unit : y >= b * unit; y += step * dir) {
 	await page.mouse.wheel(0, step * dir);
 	await page.waitForTimeout(16);
-	const u = await page.evaluate(() => window.__futariProbe.stats().travel * 1.16);
+	const u = await page.evaluate(() => window.__futariProbe.stats().travel * window.__futari.map.cycle);
 	if (dir > 0 ? u >= next : u <= next) {
 		frames.push({ label: `u ${u.toFixed(3)}`, data: (await page.screenshot({ type: 'jpeg', quality: 76 })).toString('base64') });
 		next += every * dir;

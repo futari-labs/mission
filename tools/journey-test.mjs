@@ -7,7 +7,7 @@ const base = process.argv[2] ?? 'http://localhost:4173';
 const gpu = ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'];
 let failed = 0;
 const check = (name, ok, detail = '') => { if (!ok) failed++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`); };
-// positions are journey units: one lap is 1.16, and the return to the opening runs from 0.98
+// positions are journey units, read from the page: lap length, rests, and where the return starts
 const to = (page, u) => page.evaluate((v) => window.__futari.jump(v), u);
 const units = (page) => page.evaluate(() => window.__futari.units());
 const chapter = (page) => page.evaluate(() => window.__futari?.chapter ?? null);
@@ -27,8 +27,10 @@ async function open(args, ctx = {}, url = base) {
 // ---- desktop, pointer and keyboard
 let { browser, page, errors } = await open(gpu);
 await page.waitForTimeout(2500);
+const MAP = await page.evaluate(() => window.__futari.map);
+const R = MAP.rests;
 const order = [];
-for (const p of [0, 0.365, 0.59, 0.9, 0.59, 0.365, 0]) { await to(page, p); await page.waitForTimeout(1300); order.push(await chapter(page)); }
+for (const p of [R.lab, R.engineering, R.kensaku, R.explore, R.kensaku, R.engineering, R.lab]) { await to(page, p); await page.waitForTimeout(1300); order.push(await chapter(page)); }
 check('chapters resolve forward and back', order.join() === 'lab,engineering,kensaku,explore,kensaku,engineering,lab', order.join());
 const hrefs = await page.evaluate(() => [...document.querySelectorAll('.destinations a')].map((a) => a.href));
 check('three exact destinations', JSON.stringify(hrefs.map((h) => h.replace(/\/$/, ''))) === JSON.stringify(LINKS), hrefs.join(' '));
@@ -36,7 +38,7 @@ check('one h1', (await page.locator('h1').count()) === 1);
 
 for (const [id, repo] of [['engineering', LINKS[1]], ['kensaku', LINKS[2]]]) {
 	await page.click(`nav.chapters a[href="#${id === 'kensaku' ? 'engineering' : id}"]`);
-	await to(page, id === 'kensaku' ? 0.59 : 0.365);
+	await to(page, R[id]);
 	await page.waitForTimeout(1400);
 	const before = await units(page);
 	const button = page.locator(`#${id} button.bracket`);
@@ -78,11 +80,11 @@ await browser.close();
 // ---- touch, phone size
 ({ browser, page, errors } = await open(gpu, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }));
 await page.waitForTimeout(2500);
-await to(page, 0.365); await page.waitForTimeout(1400);
+await to(page, R.engineering); await page.waitForTimeout(1400);
 await page.tap('#engineering button.bracket'); await page.waitForTimeout(500);
 check('touch: details open by tap', await page.evaluate(() => document.querySelector('dialog').open));
 await page.tap('dialog button.close'); await page.waitForTimeout(400);
-await to(page, 0.9); await page.waitForTimeout(1500);
+await to(page, R.explore); await page.waitForTimeout(1500);
 await page.tap('.step-next'); await page.waitForTimeout(300);
 check('touch: next button selects without hover', (await page.evaluate(() => [...document.querySelectorAll('.destinations a')].findIndex((a) => a.getAttribute('aria-current')))) === 1);
 const small = await page.evaluate(() => [...document.querySelectorAll('.panel[data-active="true"] a, .panel[data-active="true"] button')].map((e) => e.getBoundingClientRect()).filter((r) => r.height < 40).length);
@@ -95,7 +97,7 @@ await browser.close();
 ({ browser, page } = await open(gpu, { reducedMotion: 'reduce' }));
 await page.waitForTimeout(2000);
 const rm = [];
-for (const p of [0, 0.2, 0.365, 0.48, 0.59, 0.75, 0.9, 1.03, 1.12, 1.16, 1.3]) { await to(page, p); await page.waitForTimeout(500); rm.push(await chapter(page)); }
+for (const p of [0, 0.2, R.engineering, 0.5, R.kensaku, 0.8, R.explore, MAP.returnFrom + 0.04, MAP.cycle - 0.04, MAP.cycle, MAP.cycle + 0.14]) { await to(page, p); await page.waitForTimeout(500); rm.push(await chapter(page)); }
 check('reduced motion: same content order around the loop, a chapter always shown', rm.every(Boolean) && rm.filter((c, i, a) => c !== a[i - 1]).join() === 'lab,engineering,kensaku,explore,lab', rm.join());
 await browser.close();
 
@@ -118,7 +120,7 @@ await browser.close();
 	await pg.goto(base);
 	await pg.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
 	await pg.waitForTimeout(2500);
-	await to(pg, 0.365); await pg.waitForTimeout(1300);
+	await to(pg, R.engineering); await pg.waitForTimeout(1300);
 	const r = await pg.evaluate(() => ({ webgl: document.documentElement.dataset.webgl, chapters: document.documentElement.dataset.chapters, title: getComputedStyle(document.querySelector('#engineering .panel')).opacity, chapter: window.__futari.chapter }));
 	check('exhibits blocked: opening keeps running, copy shows', r.webgl === 'ok' && r.chapters === 'unavailable' && r.title === '1' && r.chapter === 'engineering', JSON.stringify(r));
 	await b.close();

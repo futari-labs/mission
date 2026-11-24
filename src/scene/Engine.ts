@@ -9,10 +9,11 @@ import { Atmosphere } from './atmosphere.ts';
 import { Beam } from './beam.ts';
 import { type ExhibitSet, loadExhibits } from './exhibits.ts';
 import { Explore } from './explore.ts';
-import { emptyPose, emptyState, poseAt, restUnits, STATION, stateAt } from './journey.ts';
+import { emptyPose, emptyState, poseAt, RING_Z, restUnits, STATION, stateAt } from './journey.ts';
 import { Landmark } from './landmark.ts';
 import { look } from './look.ts';
 import { loadDetailTexture, stoneUniforms } from './materials.ts';
+import { Passage } from './passage.ts';
 import { createSky, installFog } from './sky.ts';
 import { Terrain } from './terrain.ts';
 import { TransitionEffect } from './transition.ts';
@@ -51,6 +52,7 @@ export class Engine {
 	private readonly transition: TransitionEffect;
 	private exhibits: ExhibitSet | null = null;
 	private explore: Explore | null = null;
+	private passage: Passage | null = null;
 	private readonly timer = new THREE.Timer();
 	private readonly raycaster = new THREE.Raycaster();
 	private readonly pointer = new THREE.Vector2();
@@ -224,7 +226,9 @@ export class Engine {
 			explore.setForm(this.form, true);
 			this.exhibits = exhibits;
 			this.explore = explore;
-			const groups = [exhibits.engineering.root, exhibits.kensaku.root, explore.root];
+			const passage = new Passage(exhibits.ringSegment);
+			this.passage = passage;
+			const groups = [exhibits.engineering.root, exhibits.kensaku.root, explore.root, passage.root];
 			this.scene.add(...groups, exhibits.engineering.glow, exhibits.kensaku.glow, explore.lamp);
 			this.warm(groups);
 		} catch (error) {
@@ -245,7 +249,7 @@ export class Engine {
 		this.lab.visible = false;
 		for (const group of groups) group.visible = true;
 		this.beam.update(1, 0);
-		for (const station of [STATION.engineering, STATION.kensaku, STATION.explore]) {
+		for (const station of [STATION.engineering, STATION.kensaku, STATION.explore, new THREE.Vector3(0, STATION.kensaku.y, RING_Z[1])]) {
 			eye.position.set(station.x + 2, station.y + 1, station.z + 12);
 			eye.lookAt(station);
 			eye.updateMatrixWorld();
@@ -421,8 +425,18 @@ export class Engine {
 		if (this.exhibits) {
 			this.exhibits.engineering.visible = s.engineering;
 			this.exhibits.kensaku.visible = s.kensaku;
-			if (s.engineering) this.exhibits.engineering.update(dt, this.chapter === 'engineering' ? pointer : null, time);
-			if (s.kensaku) this.exhibits.kensaku.update(dt, this.chapter === 'kensaku' ? pointer : null, time);
+			if (s.engineering) {
+				this.exhibits.engineering.assemble(s.engineeringBuild, s.engineeringShell);
+				this.exhibits.engineering.update(dt, this.chapter === 'engineering' ? pointer : null, time);
+			}
+			if (s.kensaku) {
+				this.exhibits.kensaku.assemble(s.kensakuBuild, s.kensakuShell);
+				this.exhibits.kensaku.update(dt, this.chapter === 'kensaku' ? pointer : null, time);
+			}
+		}
+		if (this.passage) {
+			this.passage.visible = s.passage;
+			if (s.passage) this.passage.update(s.rings, s.ringVeil);
 		}
 		if (this.explore) {
 			this.explore.visible = s.explore;
@@ -443,6 +457,7 @@ export class Engine {
 		this.terrain.dispose();
 		this.atmosphere.dispose();
 		this.beam.dispose();
+		this.passage?.dispose();
 		this.exhibits?.dispose();
 		this.explore?.dispose();
 		stoneUniforms.uDetail.value?.dispose();

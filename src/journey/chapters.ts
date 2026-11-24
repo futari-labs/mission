@@ -1,7 +1,7 @@
 // Chapter ranges on one lap of the journey. No rendering imports, so the page shell can use it.
 //
 // Positions are in journey units. One lap is CYCLE units long: the four chapters and their
-// transitions take 0 to 0.98, and the return to the opening takes 0.98 to CYCLE. Position CYCLE
+// transitions take 0 to 1.10, and the return to the opening takes 1.10 to CYCLE. Position CYCLE
 // is position 0 of the next lap.
 export type ChapterId = 'lab' | 'engineering' | 'kensaku' | 'explore';
 
@@ -15,17 +15,17 @@ export interface ChapterRange {
 }
 
 /** Length of one lap in journey units. */
-export const CYCLE = 1.16;
+export const CYCLE = 1.28;
 /** Where the return to the opening begins. */
-export const RETURN_FROM = 0.98;
+export const RETURN_FROM = 1.1;
 /** Viewport heights of scrolling per journey unit. One lap is CYCLE times this. */
 export const SCREENS_PER_UNIT = 8.5;
 
 export const CHAPTERS: ChapterRange[] = [
 	{ id: 'lab', showFrom: -0.022, showTo: 0.105, rest: 0 },
-	{ id: 'engineering', showFrom: 0.295, showTo: 0.435, rest: 0.365 },
-	{ id: 'kensaku', showFrom: 0.52, showTo: 0.665, rest: 0.59 },
-	{ id: 'explore', showFrom: 0.835, showTo: 0.972, rest: 0.9 },
+	{ id: 'engineering', showFrom: 0.388, showTo: 0.495, rest: 0.43 },
+	{ id: 'kensaku', showFrom: 0.625, showTo: 0.735, rest: 0.67 },
+	{ id: 'explore', showFrom: 0.955, showTo: 1.092, rest: 1.02 },
 ];
 
 /** Position within the lap for any continuous travel value, in journey units. */
@@ -53,7 +53,7 @@ export function chapterOpacity(c: ChapterRange, u: number, fade = 0.012): number
 
 /** The chapter whose rest pose is used when motion is reduced. Every position belongs to one. */
 export function nearestChapter(u: number): ChapterRange {
-	const edges: [number, ChapterId][] = [[0.24, 'lab'], [0.475, 'engineering'], [0.74, 'kensaku'], [(RETURN_FROM + CYCLE) / 2, 'explore']];
+	const edges: [number, ChapterId][] = [[0.27, 'lab'], [0.54, 'engineering'], [0.83, 'kensaku'], [(RETURN_FROM + CYCLE) / 2, 'explore']];
 	const id = edges.find(([to]) => u < to)?.[1] ?? 'lab';
 	return CHAPTERS.find((c) => c.id === id)!;
 }

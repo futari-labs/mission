@@ -28,6 +28,7 @@ export const look = {
 	exhibit: { turn: 0.11, tilt: 0.06, glow: 34, shell: { color: '#dde7f5', roughness: 0.16, clear: 0.2, frosted: 0.86 } },
 	particles: { size: 0.034, color: '#8b93a6', hot: '#f2f6ff', spin: 0.23 },
 	beam: { radius: 0.013, brightness: 2.6 },
+	passage: { joint: 2.4, rim: 3.2 },
 } as const;
 
 export type Vec3Tuple = readonly [number, number, number];

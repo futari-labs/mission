@@ -44,7 +44,7 @@ for (let i = 0; i < 4; i++) {
 }
 await take('pointer sweeps');
 
-const lap = await page.evaluate(() => window.__futari.unitPixels() * 1.16);
+const lap = await page.evaluate(() => window.__futari.unitPixels() * window.__futari.map.cycle);
 if (lap > 50) {
 	await page.mouse.move(viewport.width / 2, viewport.height / 2);
 	const scroll = async (dir, label) => {

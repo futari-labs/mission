@@ -1,13 +1,14 @@
 // Verifies the looping journey in a real browser. Every scenario scrolls with wheel or touch input,
 // reads the continuous position the renderer used on every frame, and checks it.
-// Positions are journey units: one lap is 1.16, and the return to the opening runs from 0.98 to 1.16.
+// Positions are journey units. The lap length and the start of the return are read from the page.
 // Usage: node tools/loop-test.mjs [base-url] [--headless]
 import { chromium } from 'playwright-core';
 
 const base = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'http://localhost:4173';
 const headless = process.argv.includes('--headless');
 const gpu = ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'];
-const LAP = 1.16;
+let LAP = 1.28;
+let MAP = null;
 // The browser settles a scroll on a whole pixel, which can move the position back by under 1 px.
 // One pixel is about 0.00012 units. Anything beyond that would be a real backward movement.
 const BACK = -2e-4;
@@ -19,11 +20,16 @@ async function open(ctx = {}) {
 	const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...ctx });
 	const page = await context.newPage();
 	const errors = [];
-	page.on('pageerror', (e) => errors.push(String(e).slice(0, 140)));
+	page.on('pageerror', (e) => {
+		if (errors.length === 0) console.log(`      first page error: ${e.stack?.split('\n').slice(0, 4).join(' / ')}`);
+		errors.push(String(e).slice(0, 140));
+	});
 	await page.goto(`${base}/?probe`);
 	await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
 	await page.waitForTimeout(2500);
 	await page.mouse.move(700, 450);
+	MAP = await page.evaluate(() => window.__futari.map);
+	LAP = MAP.cycle;
 	return { browser, context, page, errors };
 }
 const reset = (page) => page.evaluate(() => { const p = window.__futariProbe; p.frames.length = 0; p.camera.length = 0; p.shift.length = 0; });
@@ -100,15 +106,15 @@ for (const [label, at] of [['before', LAP - 0.035], ['on', LAP], ['after', LAP +
 }
 
 // ---- 4. fast scroll across the join
-await page.evaluate((u) => window.__futari.jump(u), 0.9);
+await page.evaluate((u) => window.__futari.jump(u), MAP.rests.explore);
 await settle(page);
 await reset(page);
-await wheel(page, 0.55, 5200);
+await wheel(page, LAP - MAP.rests.explore + 0.3, 5200);
 await settle(page, 1800);
 t = await trace(page);
 show('fast across the join', t);
 check('4. fast scroll across the join never moves backward', t.mostBackward >= BACK, `most backward ${t.mostBackward}`);
-check('4. the return transition is traversed, not skipped', t.from < 0.95 && t.to > LAP + 0.2 && t.frames > 60, `${t.frames} frames from ${t.from} to ${t.to}`);
+check('4. the return transition is traversed, not skipped', t.from < MAP.returnFrom && t.to > LAP + 0.2 && t.frames > 60, `${t.frames} frames from ${t.from} to ${t.to}`);
 check('4. arrives in the first transition of the next lap', (await stats(page)).progress > 0.2);
 
 // ---- 5. after crossing: navigation, dialog, reload, resize
@@ -134,20 +140,21 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(500);
 s = await stats(page);
 check('5. dialog after crossing: opens, holds position, returns focus', inDialog.open && inDialog.focus && Math.abs(s.travel - held) < 0.0008 && (await page.evaluate(() => document.activeElement === document.querySelector('#engineering button.bracket'))), `position ${(held * LAP).toFixed(4)} then ${(s.travel * LAP).toFixed(4)}`);
-await page.evaluate((u) => window.__futari.jump(u), 2 * LAP + 1.07);
+const inReturn = MAP.returnFrom + 0.09;
+await page.evaluate((u) => window.__futari.jump(u), 2 * LAP + inReturn);
 await settle(page, 800);
 await page.reload();
 await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
 await settle(page, 1500);
 s = await stats(page);
-check('5. reload inside the return restores the same place in the lap', Math.abs(s.progress - 1.07) < 0.003, `position within lap ${s.progress.toFixed(4)}`);
+check('5. reload inside the return restores the same place in the lap', Math.abs(s.progress - inReturn) < 0.003, `position within lap ${s.progress.toFixed(4)}`);
 await page.setViewportSize({ width: 800, height: 1000 });
 await settle(page, 900);
 const resized = await stats(page);
 await page.setViewportSize({ width: 1440, height: 900 });
 await settle(page, 900);
-check('5. resize keeps the same place in the lap', Math.abs(resized.progress - 1.07) < 0.003 && Math.abs((await stats(page)).progress - 1.07) < 0.003, `${resized.progress.toFixed(4)}`);
-check('no page errors', errors.length === 0, errors.join(' | '));
+check('5. resize keeps the same place in the lap', Math.abs(resized.progress - inReturn) < 0.003 && Math.abs((await stats(page)).progress - inReturn) < 0.003, `${resized.progress.toFixed(4)}`);
+check('no page errors', errors.length === 0, [...new Set(errors)].slice(0, 2).join(' | '));
 await browser.close();
 
 // ---- touch: synthesized flings on a phone-sized touch context, two laps downward
