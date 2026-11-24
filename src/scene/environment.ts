@@ -11,7 +11,7 @@
 // The return moves this whole group along z. Every pattern is therefore placed in the group's own
 // coordinates (world position less `uShift`), so cloud, snow line, and falling leaves move with it.
 import * as THREE from 'three';
-import { experiment, tag } from './experiment.ts';
+import { tag } from './experiment.ts';
 import { look } from './look.ts';
 import { valueNoise } from './noise.ts';
 import { SKY_GLSL } from './sky.ts';
@@ -203,8 +203,6 @@ export class Environment {
 		// The banks and groves belong to the growing seasons. In winter the opening's own terrain stands
 		// where they are, so they fade out into the sky and stop being drawn.
 		this.grove = new Grove(this.uniforms, coarse);
-		// TEMPORARY, for the lead to delete: until the engine calls setMultisampled itself, follow ?msaa=0
-		if (experiment.msaa === 0) this.grove.setMultisampled(false);
 		this.root.add(this.grove.root);
 
 		// two cloud decks at different depths: gaps in the upper one show the lower one moving more slowly

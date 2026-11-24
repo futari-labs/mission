@@ -242,7 +242,6 @@ export class Engine {
 	private buildPipeline(): void {
 		const off = experiment.off;
 		this.composer.addPass(new RenderPass(this.scene, this.camera));
-		if (off.has('post')) return;
 		if (!off.has('transition')) {
 			this.transitionPass = new EffectPass(this.camera, this.transition);
 			this.composer.addPass(this.transitionPass);
@@ -253,7 +252,8 @@ export class Engine {
 		bloom.setSize = (width: number, height: number) => setSize(Math.round(width * this.bloomScale), Math.round(height * this.bloomScale));
 		this.bloom = bloom;
 		const grain = new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: false });
-		grain.blendMode.opacity.value = look.grain;
+		// grain is the one thing that differs between two frames of one build, so comparisons switch it off
+		grain.blendMode.opacity.value = off.has('grain') ? 0 : look.grain;
 		const vignette = new VignetteEffect({ offset: look.vignette.offset, darkness: look.vignette.darkness });
 		const tone = new ToneMappingEffect({ mode: ToneMappingMode.NEUTRAL ?? ToneMappingMode.AGX });
 		this.composer.addPass(new EffectPass(this.camera, ...(off.has('bloom') ? [] : [bloom]), vignette, tone, grain));
@@ -393,7 +393,7 @@ export class Engine {
 			for (const group of groups) group.visible = false;
 			this.scene.add(...groups, exhibits.engineering.glow, exhibits.kensaku.glow, explore.lamp);
 			applyLayerExperiment(this.scene);
-			this.syncFoliage();
+			this.syncSampling();
 			await this.compile();
 			if (this.disposed) return;
 			// From here the frame loop draws them wherever the journey stands, so a visit that begins in a
@@ -500,15 +500,20 @@ export class Engine {
 		gsap.to(this.dim, { value: on ? 1 : 0, duration: this.options.reducedMotion ? 0 : 0.5, ease: 'power2.out', overwrite: true });
 	}
 
-	/** Leaf edges are resolved by multisampling where the scene buffer has samples, and by an alpha test where it has none. */
-	private syncFoliage(): void {
-		(this.environment as { setMultisampled?: (on: boolean) => void }).setMultisampled?.(this.composer.multisampling > 0);
+	/**
+	 * What is drawn differently where the scene buffer has one sample per pixel: leaf edges are cut
+	 * by an alpha test and not by coverage, and the beam is a ribbon with a soft edge and not a thin tube.
+	 */
+	private syncSampling(): void {
+		const multisampled = this.composer.multisampling > 0;
+		this.environment.setMultisampled(multisampled);
+		this.beam.setMultisampled(multisampled);
 	}
 
 	/** Puts the governor's tier into effect: sampling, bloom resolution, and through `resize` the pixel ratio. */
 	private applyTier(): void {
 		this.composer.multisampling = this.samples;
-		this.syncFoliage();
+		this.syncSampling();
 		this.bloomScale = experiment.bloom ?? this.tier.bloom;
 		// at half size one fewer level reaches the same widest blur
 		if (this.bloom) this.bloom.mipmapBlurPass.levels = this.bloomScale <= 0.5 ? 7 : 8;
@@ -544,6 +549,7 @@ export class Engine {
 		this.camera.aspect = width / height;
 		this.renderer.setPixelRatio(pixelRatio);
 		this.composer.setSize(width, height, false);
+		this.beam.setBufferHeight(height * pixelRatio);
 		// rebuilding the buffers costs a frame or two, which says nothing about the tier
 		this.governor.hold(performance.now(), HOLD_AFTER_CHANGE_MS);
 		this.diagnostics?.mark('resize', `${width}x${height} css, ratio ${pixelRatio.toFixed(2)}, ${samples} samples, ${this.tier.name}`);

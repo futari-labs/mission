@@ -6,7 +6,7 @@
 //   ?tier=1              start on this quality tier (0 is the lowest) and stay on it
 //   ?bloom=0.5           bloom resolution as a share of the frame
 //   ?governor=off        never change tier
-//   ?off=bloom,clouds    leave parts of the frame out. Passes: post, bloom, transition, shadows.
+//   ?off=bloom,clouds    leave parts of the frame out. Passes: bloom, transition, grain, shadows.
 //                        Layers: terrain, landmark, ridges, clouds, banks, wood, foliage, mist,
 //                        particles, shafts, exhibits, explore, passage.
 //
