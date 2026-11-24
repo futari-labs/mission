@@ -21,6 +21,9 @@ const LAYERS = 5;
 
 type Uniforms = Record<string, THREE.IUniform>;
 
+/** The alpha below which a pixel of a leaf card is dropped: in a multisampled frame, and in one with a single sample per pixel. */
+const CUT = { coverage: 0.04, single: 0.5 } as const;
+
 /** Cuts a tall image of square layers into a texture array, so each layer tiles and mipmaps on its own. */
 async function loadLayers(url: string, colour: boolean): Promise<{ texture: THREE.DataArrayTexture; mean: THREE.Vector3[] }> {
 	const image = await new THREE.ImageLoader().loadAsync(url);
@@ -245,6 +248,7 @@ const CARD_VERTEX = /* glsl */ `
 const CARD_FRAGMENT = /* glsl */ `
 	uniform sampler2D uFoliage;
 	uniform vec3 uLeafA, uLeafB, uLeafC, uPetal, uPetalDeep;
+	uniform float uCut;
 	varying vec3 vWorld;
 	varying vec3 vNormal;
 	varying vec2 vUv;
@@ -259,7 +263,10 @@ const CARD_FRAGMENT = /* glsl */ `
 		vec4 t = texture2D(uFoliage, vUv, -1.0);
 		float a = t.a * (1.0 + 0.5 * lod);
 		a = clamp((a - 0.44) / max(fwidth(a), 0.06) + 0.5, 0.0, 1.0);
-		if (a < 0.04) discard;
+		// With multisampling the alpha becomes coverage, and only the empty part of a card is dropped.
+		// With one sample per pixel there is no coverage, so the edge is cut where it is half covered:
+		// the same outline, without the ramp. Cutting any lower draws every leaf a pixel fat.
+		if (a < uCut) discard;
 
 		vec3 col;
 		if (vBake.a > 0.5) {
@@ -299,6 +306,8 @@ export class Grove {
 	private readonly own: Uniforms;
 	private readonly textures: THREE.Texture[] = [];
 	private defines: Record<string, string | number> = {};
+	private readonly cards: THREE.ShaderMaterial[] = [];
+	private multisampled = true;
 
 	/** `shared` are the environment's uniforms: season, light, sky, veil, and the shift of the return. */
 	constructor(shared: Uniforms, coarse: boolean) {
@@ -315,6 +324,7 @@ export class Grove {
 			/** How much a plant in blossom holds its leaves back, and how much of each stem shows: the trees are whole. */
 			uHold: { value: 0.62 },
 			uStem: { value: 2 },
+			uCut: { value: CUT.coverage },
 		};
 		// in winter the opening's own terrain stands here instead
 		this.root.visible = false;
@@ -396,8 +406,20 @@ export class Grove {
 		const wood = this.material(WOOD_VERTEX, WOOD_FRAGMENT, { uBark: { value: new THREE.Color(bark) }, ...own });
 		const cards = this.material(CARD_VERTEX, CARD_FRAGMENT, own);
 		// edges of leaves are resolved by multisampling, not by blending, so they need no sorting
-		cards.alphaToCoverage = true;
+		cards.alphaToCoverage = this.multisampled;
+		this.cards.push(cards);
 		return { wood, cards };
+	}
+
+	/**
+	 * Whether the frame the cards are drawn into is multisampled. When it is not, alpha cannot become
+	 * coverage, so every card, the climber's included, cuts its own edge instead. The switch is one
+	 * uniform and one GL state: nothing recompiles.
+	 */
+	setMultisampled(on: boolean): void {
+		this.multisampled = on;
+		this.own.uCut.value = on ? CUT.coverage : CUT.single;
+		for (const material of this.cards) material.alphaToCoverage = on;
 	}
 
 	/**
