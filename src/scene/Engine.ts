@@ -29,7 +29,7 @@ declare global {
 			script: number[];
 			camera: number[];
 			shift: number[];
-			stats: () => { calls: number; triangles: number; dpr: number; width: number; height: number; progress: number; travel: number; programs: number; geometries: number; textures: number; rebases: number; tier: number; tierName: string; msaa: number; bufferWidth: number; bufferHeight: number; governor: string };
+			stats: () => { calls: number; triangles: number; dpr: number; width: number; height: number; progress: number; travel: number; programs: number; geometries: number; textures: number; rebases: number; tier: number; tierName: string; msaa: number; bufferWidth: number; bufferHeight: number; governor: string; frameCost: number; slowShare: number };
 		};
 	}
 }
@@ -170,7 +170,7 @@ export class Engine {
 				shift,
 				stats: () => {
 					const buffer = this.renderer.getDrawingBufferSize(this.bufferSize);
-					return { calls: info.render.calls, triangles: info.render.triangles, dpr: this.pixelRatio, width: this.canvas.clientWidth, height: this.canvas.clientHeight, progress: this.units, travel: this.travel, programs: info.programs?.length ?? 0, geometries: info.memory.geometries, textures: info.memory.textures, rebases: rebaseCount(), tier: this.governor.tier, tierName: this.tier.name, msaa: this.composer.multisampling, bufferWidth: buffer.x, bufferHeight: buffer.y, governor: this.governor.status };
+					return { calls: info.render.calls, triangles: info.render.triangles, dpr: this.pixelRatio, width: this.canvas.clientWidth, height: this.canvas.clientHeight, progress: this.units, travel: this.travel, programs: info.programs?.length ?? 0, geometries: info.memory.geometries, textures: info.memory.textures, rebases: rebaseCount(), tier: this.governor.tier, tierName: this.tier.name, msaa: this.composer.multisampling, bufferWidth: buffer.x, bufferHeight: buffer.y, governor: this.governor.status, frameCost: this.governor.lastCost, slowShare: this.governor.slowShare };
 				},
 			};
 			this.probe = (interval) => {
@@ -573,17 +573,22 @@ export class Engine {
 				if (this.chores.length === 0) this.runChores();
 			}
 			const measure = this.governor.wantsCost;
-			const began = this.probe || measure ? performance.now() : 0;
+			const began = this.probe ? performance.now() : 0;
 			this.render(Math.min(raw, 0.05));
 			if (this.probe) this.scriptTimes.push(performance.now() - began);
 			if (measure) {
-				// Reading one pixel back returns only when the GPU has finished the frame, so the time to here is
-				// what the whole frame cost. Asked for a few times a visit, when a change of tier depends on it.
+				// Reading one pixel back returns only when the GPU has finished everything queued. After that the
+				// same frame is drawn again and read back again: the time between the two reads is what one whole
+				// frame costs, script and GPU together, with no wait for the display in it. Asked for a few times a
+				// visit, when a change of tier depends on it.
 				const gl = this.renderer.getContext();
 				this.renderer.setRenderTarget(null);
 				gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.pixel);
+				const from = performance.now();
+				this.render(0);
+				gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.pixel);
 				const now = performance.now();
-				if (this.governor.cost(now - began, now) !== null) this.changeTier();
+				if (this.governor.cost(now - from, now) !== null) this.changeTier();
 			}
 			this.diagnostics?.frameEnd();
 		};

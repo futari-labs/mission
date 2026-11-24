@@ -52,7 +52,7 @@ line('script in the first frame', rows.map((r) => r.firstScript));
 line('frames over 34 ms until the entrance ends', rows.map((r) => r.over34));
 line('longest frame until the entrance ends', rows.map((r) => r.longest));
 line('time in frames over 34 ms', rows.map((r) => r.inSlow));
-stations.forEach((u, s) => line(`longest frame on first arrival at ${u}`, rows.map((r) => r.arrivals[s])));
+for (const [s, u] of stations.entries()) line(`longest frame on first arrival at ${u}`, rows.map((r) => r.arrivals[s]));
 line('shader programs after the entrance', rows.map((r) => r.programs));
 console.log('slow frames of each load (frame number: interval):');
 for (const r of rows) console.log(`  ${r.slow.join('  ') || 'none'}`);
