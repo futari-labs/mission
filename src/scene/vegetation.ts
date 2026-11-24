@@ -131,6 +131,9 @@ const BANK_FRAGMENT = /* glsl */ `
 		// turf at two sizes, so the photograph does not repeat across a hillside
 		vec2 ug = p.xz / 3.4;
 		vec3 grassTex = mix(texture(uLand, vec3(ug, float(${LAYER.grass}))).rgb, texture(uLand, vec3(p.zx / 12.7 + 0.37, float(${LAYER.grass}))).rgb, 0.5);
+		// close to the camera, a finer layer keeps the turf from going soft
+		float close = 1.0 - smoothstep(8.0, 30.0, distance(vWorld, cameraPosition));
+		grassTex *= mix(vec3(1.0), 0.55 + 0.9 * texture(uLand, vec3(p.xz / 0.83, float(${LAYER.grass}))).rgb / uMean[${LAYER.grass}], 0.6 * close);
 		vec2 us = p.xz / 4.3;
 		vec2 ul = p.xz / 3.1;
 
@@ -178,12 +181,15 @@ const WOOD_FRAGMENT = /* glsl */ `
 	uniform mediump sampler2DArray uLandNormal;
 	uniform vec3 uMean[${LAYERS}];
 	uniform vec3 uBark;
+	uniform float uStem;
 	varying vec3 vWorld;
 	varying vec3 vNormal;
 	varying vec2 vUv;
 	varying vec4 vBake;
 	${LIGHT_GLSL}
 	void main() {
+		// a plant that grows in view shows only as much of each stem as it has grown
+		if (vBake.a > uStem) discard;
 		vec3 n = normalize(vNormal);
 		vec3 tex = texture(uLand, vec3(vUv, float(${LAYER.bark}))).rgb / uMean[${LAYER.bark}];
 		vec3 col = uBark * mix(vec3(dot(tex, vec3(0.3, 0.5, 0.2))), tex, 0.4) * (0.85 + 0.3 * vBake.b);
@@ -203,7 +209,7 @@ const WOOD_FRAGMENT = /* glsl */ `
 	}`;
 
 const CARD_VERTEX = /* glsl */ `
-	uniform float uCanopy, uBlossom, uTime;
+	uniform float uCanopy, uBlossom, uTime, uHold;
 	attribute vec2 uv1;
 	attribute vec4 aBake;
 	attribute vec4 aPlant;
@@ -215,7 +221,7 @@ const CARD_VERTEX = /* glsl */ `
 	void main() {
 		vec3 centre = (modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz;
 		// each plant leafs a little early or late, and one in blossom holds its leaves back until the petals fall
-		float cover = uCanopy * (1.0 - 0.62 * uBlossom * aPlant.z) + 0.2 * (aPlant.x - 0.5);
+		float cover = uCanopy * (1.0 - uHold * uBlossom * aPlant.z) + 0.2 * (aPlant.x - 0.5);
 		float shown = aBake.a > 0.5
 			? smoothstep(0.0, 0.16, uBlossom * aPlant.z * 1.2 - aBake.r)
 			: smoothstep(0.0, 0.14, cover - aBake.r);
@@ -275,12 +281,23 @@ const CARD_FRAGMENT = /* glsl */ `
 		gl_FragColor = vec4(intoSky(col * lit, vWorld), a);
 	}`;
 
+/**
+ * A card's alpha is only there to be turned into coverage. Left in the frame it would tell the
+ * passes that follow that the leaf edges are part transparent, and they would treat those pixels
+ * differently from the sky around them. So a mesh of cards does not write alpha.
+ */
+function keepAlpha(mesh: THREE.Mesh): void {
+	mesh.onBeforeRender = (renderer) => renderer.getContext().colorMask(true, true, true, false);
+	mesh.onAfterRender = (renderer) => renderer.getContext().colorMask(true, true, true, true);
+}
+
 export class Grove {
 	readonly root = new THREE.Group();
 	private readonly shared: Uniforms;
 	private readonly coarse: boolean;
 	private readonly own: Uniforms;
 	private readonly textures: THREE.Texture[] = [];
+	private defines: Record<string, string | number> = {};
 
 	/** `shared` are the environment's uniforms: season, light, sky, veil, and the shift of the return. */
 	constructor(shared: Uniforms, coarse: boolean) {
@@ -294,6 +311,9 @@ export class Grove {
 			uRock: { value: new THREE.Color(look.environment.cliff) },
 			uPetal: { value: new THREE.Color(look.environment.petal) },
 			uPetalDeep: { value: new THREE.Color(look.environment.petalDeep) },
+			/** How much a plant in blossom holds its leaves back, and how much of each stem shows: the trees are whole. */
+			uHold: { value: 0.62 },
+			uStem: { value: 2 },
 		};
 		// in winter the opening's own terrain stands here instead
 		this.root.visible = false;
@@ -316,11 +336,10 @@ export class Grove {
 		this.own.uMean.value = albedo.mean;
 
 		const extras = gltf.scene.userData as { species: string[]; uvTiles: number; cardReach: number; plants: number[][] };
-		const defines: Record<string, string | number> = { UV_TILES: extras.uvTiles, CARD_REACH: extras.cardReach };
+		this.defines = { UV_TILES: extras.uvTiles, CARD_REACH: extras.cardReach };
 		// surface relief costs several texture reads per pixel, which a phone's fill rate should keep
-		if (!this.coarse) defines.FINE = 1;
-		const material = (vertexShader: string, fragmentShader: string, more: Uniforms = {}) =>
-			new THREE.ShaderMaterial({ uniforms: { ...this.shared, ...this.own, ...more }, defines, vertexShader, fragmentShader, fog: false });
+		if (!this.coarse) this.defines.FINE = 1;
+		const material = this.material;
 		const meshes = meshesOf(gltf.scene);
 		gltf.scene.updateMatrixWorld(true);
 		const bake = (mesh: THREE.Mesh) => {
@@ -344,11 +363,7 @@ export class Grove {
 		const turn = new THREE.Quaternion();
 		const up = new THREE.Vector3(0, 1, 0);
 		extras.species.forEach((species, s) => {
-			const bark = { uBark: { value: new THREE.Color(look.environment.bark[s]) } };
-			const wood = material(WOOD_VERTEX, WOOD_FRAGMENT, bark);
-			const cards = material(CARD_VERTEX, CARD_FRAGMENT);
-			// edges of leaves are resolved by multisampling, not by blending, so they need no sorting
-			cards.alphaToCoverage = true;
+			const { wood, cards } = this.plantMaterials(look.environment.bark[s]);
 			for (const detail of [0, 1]) {
 				const here = plants.filter((p) => p[0] === s && (this.coarse ? 1 : p[1]) === detail);
 				if (here.length === 0) continue;
@@ -363,19 +378,50 @@ export class Grove {
 						data.set([p[7], p[8], p[9], p[6]], i * 4);
 					});
 					mesh.geometry.setAttribute('aPlant', new THREE.InstancedBufferAttribute(data, 4));
-					if (part === 'cards') {
-						// A card's alpha is only there to be turned into coverage. Left in the frame it would
-						// tell the passes that follow that the leaf edges are part transparent, and they would
-						// treat those pixels differently from the sky around them. So alpha is not written.
-						mesh.onBeforeRender = (renderer) => renderer.getContext().colorMask(true, true, true, false);
-						mesh.onAfterRender = (renderer) => renderer.getContext().colorMask(true, true, true, true);
-					}
+					if (part === 'cards') keepAlpha(mesh);
 					mesh.frustumCulled = false;
 					mesh.renderOrder = -5;
 					this.root.add(mesh);
 				}
 			}
 		});
+	}
+
+	private material = (vertexShader: string, fragmentShader: string, more: Uniforms = {}) =>
+		new THREE.ShaderMaterial({ uniforms: { ...this.shared, ...this.own, ...more }, defines: this.defines, vertexShader, fragmentShader, fog: false });
+
+	/** The wood and card materials of one kind of plant. `own` replaces any uniform, for a plant with its own growth. */
+	plantMaterials(bark: string, own: Uniforms = {}): { wood: THREE.ShaderMaterial; cards: THREE.ShaderMaterial } {
+		const wood = this.material(WOOD_VERTEX, WOOD_FRAGMENT, { uBark: { value: new THREE.Color(bark) }, ...own });
+		const cards = this.material(CARD_VERTEX, CARD_FRAGMENT, own);
+		// edges of leaves are resolved by multisampling, not by blending, so they need no sorting
+		cards.alphaToCoverage = true;
+		return { wood, cards };
+	}
+
+	/**
+	 * One plant that is not part of the groves, from its wood and card meshes: the climber on the
+	 * Engineering exhibit. It is drawn by the same shaders, so the season lights and colours it, and
+	 * `own` carries its own growth. The caller owns the result and disposes of its materials.
+	 */
+	plant(woodMesh: THREE.Mesh, cardMesh: THREE.Mesh, bark: string, own: Uniforms): THREE.Group {
+		const group = new THREE.Group();
+		const materials = this.plantMaterials(bark, own);
+		for (const [source, material] of [[woodMesh, materials.wood], [cardMesh, materials.cards]] as const) {
+			source.updateWorldMatrix(true, false);
+			if (source.geometry.getAttribute('color')) {
+				source.geometry.setAttribute('aBake', source.geometry.getAttribute('color'));
+				source.geometry.deleteAttribute('color');
+			}
+			const mesh = new THREE.InstancedMesh(source.geometry, material, 1);
+			mesh.setMatrixAt(0, source.matrixWorld);
+			// leafs on time, a middling tint, flowers fully, and is its own size
+			mesh.geometry.setAttribute('aPlant', new THREE.InstancedBufferAttribute(new Float32Array([0.5, 0.45, 1, 1]), 4));
+			mesh.frustumCulled = false;
+			if (source === cardMesh) keepAlpha(mesh);
+			group.add(mesh);
+		}
+		return group;
 	}
 
 	dispose(): void {

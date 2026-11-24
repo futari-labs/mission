@@ -25,7 +25,29 @@ export const look = {
 	},
 	pointer: { radius: 2.7, travel: 0.32, twist: 0.075, stiffness: 5.5 },
 	entrance: { duration: 3.8 },
-	exhibit: { turn: 0.11, tilt: 0.06, glow: 34, shell: { color: '#dde7f5', roughness: 0.16, clear: 0.2, frosted: 0.86 } },
+	// The exhibits stand in their own seasons. Each tone is a dark, a light, and what lies on top:
+	// lichen on stone, weathering on timber, polish on bronze.
+	exhibit: {
+		glow: { engineering: 9, kensaku: 16 },
+		climber: '#5d5a3c',
+		// The instrument's light, in its own coordinates: from the mirror into the lens, and from the lens to
+		// its point on the first plate. `water` is the level and radius of the basin's surface, and `piers`
+		// where the two piers stand in it: distance from the middle, half-width, depth along z, and height.
+		optics: { glass: '#eef6ff', sun: '#fff1d6', mirror: [0, -1.02, 1.96], lensFront: [0, 0, 0.42], lensBack: [0, 0, 0.3], point: [0, 0, -0.26], water: [-1.815, 1.385], piers: [1.12, 0.1, 0.35, 1.9] },
+		spring: {
+			stone: { colors: ['#535966', '#858b99', '#8f9678'], cover: 0.5 },
+			soil: { colors: ['#2a231e', '#43372d', '#4c4233'], cover: 0.4 },
+			timber: { colors: ['#6a4930', '#9b7049', '#a9a294'], cover: 0.8 },
+			metal: { colors: ['#3a3029', '#5a4838', '#b58d58'], cover: 1 },
+		},
+		summer: {
+			stone: { colors: ['#575c67', '#8b8f98', '#b6b1a2'], cover: 0.45 },
+			slate: { colors: ['#2b2f37', '#434955', '#6a707a'], cover: 0.25 },
+			soil: { colors: ['#2a231e', '#43372d', '#4c4233'], cover: 0.4 },
+			timber: { colors: ['#6a4930', '#9b7049', '#a9a294'], cover: 0.8 },
+			metal: { colors: ['#3a3029', '#5f4b37', '#c79a5c'], cover: 1 },
+		},
+	},
 	particles: { size: 0.034, color: '#8b93a6', hot: '#f2f6ff', spin: 0.23 },
 	beam: { radius: 0.013, brightness: 2.6 },
 	passage: { joint: 2.4, rim: 3.2 },
@@ -54,8 +76,8 @@ export const look = {
 	 */
 	seasons: [
 		{ sky: '#a3a8b6', haze: 1, key: '#fff7ee', keyPower: 2.5, sun: [-15, 18.5, 15], hemiSky: '#e6ecf6', hemiGround: '#6f7684', snowLine: -60, growth: 0, canopy: 0, blossom: 0, leafA: '#5f7a55', leafB: '#6d8a5c', leafC: '#7a8a58', grass: '#6c7460', ground: '#5a606c', litter: 0, flake: '#f2f6ff', flakes: 1, leaf: 0, cloud: 1 },
-		{ sky: '#b0bbbf', haze: 1.08, key: '#fff1dc', keyPower: 2.6, sun: [-15, 18.5, 15], hemiSky: '#eef1ee', hemiGround: '#7c8873', snowLine: 112, growth: 0.8, canopy: 0.56, blossom: 1, leafA: '#779c56', leafB: '#90ae66', leafC: '#afbc60', grass: '#7a9856', ground: '#7c7d66', litter: 0, flake: '#f7dbe3', flakes: 0.3, leaf: 0.55, cloud: 1.03 },
-		{ sky: '#9bb1cd', haze: 0.6, key: '#fffcf4', keyPower: 3.1, sun: [-10, 24, 11], hemiSky: '#e4eefb', hemiGround: '#6c8068', snowLine: 172, growth: 1, canopy: 1.12, blossom: 0, leafA: '#4c7150', leafB: '#63895c', leafC: '#7b9450', grass: '#5f8450', ground: '#6f7458', litter: 0.05, flake: '#ffffff', flakes: 0.03, leaf: 0.55, cloud: 1.16 },
+		{ sky: '#b0bbbf', haze: 1.08, key: '#fff1dc', keyPower: 2.6, sun: [-15, 18.5, 15], hemiSky: '#eef1ee', hemiGround: '#7c8873', snowLine: 112, growth: 0.8, canopy: 0.56, blossom: 1, leafA: '#779c56', leafB: '#90ae66', leafC: '#afbc60', grass: '#6c8358', ground: '#7c7d66', litter: 0, flake: '#f7dbe3', flakes: 0.3, leaf: 0.55, cloud: 1.03 },
+		{ sky: '#9bb1cd', haze: 0.6, key: '#fffcf4', keyPower: 3.1, sun: [-10, 24, 11], hemiSky: '#e4eefb', hemiGround: '#6c8068', snowLine: 172, growth: 1, canopy: 1.12, blossom: 0, leafA: '#4c7150', leafB: '#63895c', leafC: '#7b9450', grass: '#577050', ground: '#6f7458', litter: 0.05, flake: '#ffffff', flakes: 0.03, leaf: 0.55, cloud: 1.16 },
 		{ sky: '#b9aa9c', haze: 0.92, key: '#ffd5a8', keyPower: 2.5, sun: [-22, 10.5, 13], hemiSky: '#f1e7da', hemiGround: '#857565', snowLine: 190, growth: 0.62, canopy: 0.52, blossom: 0, leafA: '#c0843f', leafB: '#a2523a', leafC: '#8a8a4a', grass: '#9a8c56', ground: '#84755e', litter: 1, flake: '#d2893a', flakes: 0.34, leaf: 1, cloud: 0.98 },
 	],
 } as const;

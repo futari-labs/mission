@@ -26,6 +26,8 @@ export interface Bank {
 	shrubs: number;
 	/** How likely each species is here, in the order of SPECIES without the shrub. */
 	mix: [number, number, number];
+	/** An exhibit stands here: the top is level for this many metres from the centre, and shaded where it is stood on. */
+	stand?: number;
 }
 
 // Each resting view has one bank close enough to read its trees branch by branch, on the side
@@ -38,6 +40,10 @@ export const BANKS: Bank[] = [
 	{ name: 'east', x: 78, z: -166, radius: 36, top: 3.5, cell: 1.2, trees: 12, shrubs: 4, mix: [0.3, 0.45, 0.25] },
 	{ name: 'west', x: -92, z: -196, radius: 36, top: 3, cell: 1.2, trees: 12, shrubs: 4, mix: [0.25, 0.45, 0.3] },
 	{ name: 'beyond', x: 62, z: -300, radius: 36, top: 2.5, cell: 1.4, trees: 11, shrubs: 2, mix: [0.2, 0.5, 0.3] },
+	// Each exhibit stands on its own outcrop on the line of travel. The tops meet the undersides of
+	// the exhibits' footings, which are 1.76 m and 2.05 m below the guiding light.
+	{ name: 'stand_engineering', x: 0, z: -60, radius: 9, top: 1.44, cell: 0.3, trees: 0, shrubs: 0, mix: [0, 0, 0], stand: 1.9 },
+	{ name: 'stand_kensaku', x: 0, z: -110, radius: 9, top: 1.15, cell: 0.3, trees: 0, shrubs: 0, mix: [0, 0, 0], stand: 2.1 },
 	{ name: 'north', x: -100, z: -330, radius: 44, top: 3, cell: 1.6, trees: 12, shrubs: 0, mix: [0.2, 0.5, 0.3] },
 ];
 
@@ -60,7 +66,8 @@ export function bankGround(b: Bank, x: number, z: number): Ground {
 	// a lobed outline, not a round one
 	const outline = b.radius * (0.86 + 0.2 * N.n3(ax * 1.4 + o, az * 1.4, 0.5) + 0.1 * N.n3(ax * 3.1, az * 3.1 + o, 1.5));
 	const d = Math.max(0, Math.hypot(dx, dz) / outline + 0.07 * N.n3(x * 0.07 + o, 2.2, z * 0.07));
-	const fall = smooth(0.3, 1, d);
+	// an exhibit's stand is a crag: it breaks away sooner, and more of its rock shows
+	const fall = smooth(b.stand ? 0.2 : 0.3, 1, d);
 	const drop = (b.top - FOOT) * fall ** 1.8;
 	// the flanks step down in benches that follow the contours, and the benches are broken, not continuous
 	const stepped = (height: number, tread: number, seed: number) => {
@@ -74,16 +81,18 @@ export function bankGround(b: Bank, x: number, z: number): Ground {
 	const ledges = smooth(-0.1, 0.35, N.n3(x * 0.09 + o, 5.5, z * 0.09));
 	let fallen = lerp(drop, stepped(7, 0.58 + 0.1 * facing, 1.7), 0.8 * benches);
 	fallen = lerp(fallen, lerp(fallen, stepped(1.9, 0.5, 9.3), 0.75), ledges * smooth(0.02, 0.2, fall));
-	let h = b.top - 1.5 * d * d + 1.3 * N.fbm(x * 0.05 + o, 4.1, z * 0.05, 3) * (1 - fall) - fallen;
+	// where an exhibit stands the ground is level, and takes up its own relief a little way out
+	const calm = b.stand ? smooth(b.stand * 0.75, b.stand * 2, Math.hypot(dx, dz)) : 1;
+	let h = b.top - 1.5 * d * d * calm + 1.3 * N.fbm(x * 0.05 + o, 4.1, z * 0.05, 3) * (1 - fall) * calm - fallen;
 	// gullies run down the fall line: nearly straight outward, wandering a little as they go
 	const g = N.n3(ax * 5.3 + o, az * 5.3, 3.3 + d * 0.7);
 	const gully = (1 - Math.min(1, Math.abs(g) * 4.2)) ** 2 * smooth(0.24, 0.5, d);
 	h -= (0.5 + 2.4 * fall) * gully;
 	// knuckles of rock push up through the turf around the shoulder of the hill
-	const knob = Math.max(0, N.n3(x * 0.17 + o, 7.7, z * 0.17) - 0.3);
-	const outcrop = smooth(0, 0.16, knob) * smooth(0.14, 0.4, d);
-	h += 5 * knob * smooth(0.14, 0.4, d) * (1 - 0.6 * fall);
-	h += 0.22 * N.fbm(x * 0.42, 1.1, z * 0.42 + o, 3) + 0.05 * N.n3(x * 1.9, 5, z * 1.9);
+	const knob = Math.max(0, N.n3(x * 0.17 + o, 7.7, z * 0.17) - (b.stand ? 0.12 : 0.3));
+	const outcrop = smooth(0, 0.16, knob) * smooth(0.14, 0.4, d) * calm;
+	h += 5 * knob * smooth(0.14, 0.4, d) * (1 - 0.6 * fall) * calm;
+	h += (0.22 * N.fbm(x * 0.42, 1.1, z * 0.42 + o, 3) + 0.05 * N.n3(x * 1.9, 5, z * 1.9)) * (0.25 + 0.75 * calm);
 	return { h, outcrop, gully, d };
 }
 
@@ -233,7 +242,8 @@ export function buildLandscape(): { banks: BakedBank[]; plants: Plant[] } {
 				normals.push(...normalAt(b, x, z));
 				const c = 1.3;
 				const hollow = (bankGround(b, x + c, z).h + bankGround(b, x - c, z).h + bankGround(b, x, z + c).h + bankGround(b, x, z - c).h - 4 * g.h) / c;
-				let shade = 1;
+				// the ground is darker under and close around whatever stands on it
+				let shade = b.stand ? 1 - 0.34 * smooth(b.stand, b.stand * 0.35, Math.hypot(x - b.x, z - b.z)) : 1;
 				let litter = 0.55 * g.gully + 0.5 * smooth(0.25, 1.2, hollow);
 				for (const crown of crowns) {
 					const near = Math.hypot(x - crown.x, z - crown.z) / crown.reach;

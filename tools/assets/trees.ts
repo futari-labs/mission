@@ -114,10 +114,12 @@ export const SPECIES: Species[] = [
 	},
 ];
 
-interface Branch {
+export interface Branch {
 	nodes: V3[];
 	radii: number[];
 	order: number;
+	/** For a plant that grows in view: how far it has grown when each node appears, 0 to 1. */
+	grow?: number[];
 }
 
 /** A point part of the way along a branch, with the direction and thickness of the branch there. */
@@ -171,7 +173,8 @@ function skeleton(sp: Species): Branch[] {
  * One level of detail of one species.
  *
  * Wood: `uv` is the bark coordinate in tiles divided by UV_TILES. `bake` is R occlusion,
- * G branching order (0 trunk to 1 twig), B a tone variation, A unused.
+ * G branching order (0 trunk to 1 twig), B a tone variation, A how far a growing plant has grown
+ * when that point appears (1 on the trees, which are always whole).
  *
  * Cards: `position` is the centre of the cluster, repeated on all four vertices. `normal` points
  * out of the crown, for shading the crown as one mass. `uv` is the atlas coordinate. `corner` is
@@ -182,24 +185,25 @@ function skeleton(sp: Species): Branch[] {
 export interface TreeMesh {
 	name: string;
 	wood: Part;
-	cards: Part & { corners: number[] };
+	cards: Cards;
 	/** Crown centre and radius in metres, for the app's shading. */
 	crown: number[];
 }
-interface Part {
+export interface Part {
 	positions: number[];
 	normals: number[];
 	uvs: number[];
 	bake: number[];
 	indices: number[];
 }
+export type Cards = Part & { corners: number[] };
 export const UV_TILES = 16;
 export const CARD_REACH = 2;
 /** The atlas is 4 cells wide and 2 tall. Cells 0 to 3 and 7 are leaves, 4 and 5 blossom, 6 a grass tuft. */
-export const ATLAS = { columns: 4, rows: 2 };
+export const ATLAS = { columns: 4, rows: 2, blossom: [4, 5] };
 const BARK_METRES = 1.1;
 
-function tube(part: Part, b: Branch, sides: number, flare: number, rng: () => number) {
+export function tube(part: Part, b: Branch, sides: number, flare: number, rng: () => number) {
 	const start = part.positions.length / 3;
 	let side: V3 = norm(cross(norm(sub(b.nodes[1], b.nodes[0])), [0.31, 0.2, 0.93]));
 	let run = 0;
@@ -223,7 +227,7 @@ function tube(part: Part, b: Branch, sides: number, flare: number, rng: () => nu
 			part.uvs.push(((j / sides) * wraps) / UV_TILES, run / BARK_METRES / UV_TILES);
 			// darker under the crown and where the trunk meets the ground
 			const shade = b.order === 0 ? lerp(0.62, 1, smooth(-0.1, 0.5, p[1])) * lerp(1, 0.72, smooth(1.2, 3.5, p[1])) : 0.7;
-			part.bake.push(Math.round(shade * 255), Math.round((b.order / 3) * 255), Math.round(tone * 255), 255);
+			part.bake.push(Math.round(shade * 255), Math.round((b.order / 3) * 255), Math.round(tone * 255), Math.round((b.grow?.[i] ?? 1) * 255));
 		}
 		if (i === 0) return;
 		for (let j = 0; j < sides; j++) {
@@ -234,7 +238,7 @@ function tube(part: Part, b: Branch, sides: number, flare: number, rng: () => nu
 	});
 }
 
-function card(cards: TreeMesh['cards'], centre: V3, normal: V3, half: number, cell: number, roll: number, bake: [number, number, number, number]) {
+export function card(cards: Cards, centre: V3, normal: V3, half: number, cell: number, roll: number, bake: [number, number, number, number]) {
 	const start = cards.positions.length / 3;
 	const cx = cell % ATLAS.columns;
 	const cy = Math.floor(cell / ATLAS.columns);

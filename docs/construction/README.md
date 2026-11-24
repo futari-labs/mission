@@ -1,5 +1,7 @@
 # Construction and the ring passage
 
+> The two exhibits described here were redesigned. Engineering is now a timber arbor that a climber grows through, Kensaku an open optical instrument over a basin of water, and neither has a crystal enclosure. See `docs/exhibits/README.md`. How parts move between two authored poses, the ring passage, and the return are as described below.
+
 The world builds itself as the visitor scrolls, and the camera travels through what has been built.
 
 ## What changed

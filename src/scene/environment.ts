@@ -454,6 +454,16 @@ export class Environment {
 		return this.grove.load();
 	}
 
+	/** The season's light, sky, and clock as uniforms, for anything else that is lit outside the scene's lamps. */
+	get shared(): Record<string, THREE.IUniform> {
+		return this.uniforms;
+	}
+
+	/** The groves, for anything else that grows: the climber on the Engineering exhibit. Use after `load`. */
+	get flora(): Grove {
+		return this.grove;
+	}
+
 	/** Draws the banks and groves for one offscreen frame, so they are compiled before spring needs them. */
 	warm(on: boolean): void {
 		this.grove.root.visible = on;

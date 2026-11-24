@@ -55,11 +55,14 @@ export interface JourneyState {
 	snow: number;
 	/** How far along z the installation is drawn from its station. See RETURN_SHIFT. */
 	shift: number;
-	/** Assembly of each exhibit's parts, 0 scattered to 1 seated, and of its enclosure. */
+	/**
+	 * Assembly of each exhibit's parts, 0 scattered to 1 seated, and what follows once it stands:
+	 * the climber growing through the arbor, and the instrument's light coming to a focus.
+	 */
 	engineeringBuild: number;
-	engineeringShell: number;
+	engineeringGrowth: number;
 	kensakuBuild: number;
-	kensakuShell: number;
+	kensakuFocus: number;
 	/** The passage rings: whether they render, how hidden in fog they are, and how far each has assembled. */
 	passage: boolean;
 	ringVeil: number;
@@ -199,7 +202,7 @@ export function stateAt(u: number, cameraZ: number, reducedMotion: boolean, out:
 	out.recede = 0;
 	out.snow = 1;
 	out.shift = 0;
-	out.engineeringBuild = out.engineeringShell = out.kensakuBuild = out.kensakuShell = 1;
+	out.engineeringBuild = out.engineeringGrowth = out.kensakuBuild = out.kensakuFocus = 1;
 	out.passage = false;
 	out.ringVeil = 1;
 	out.rings[0] = out.rings[1] = out.rings[2] = 1;
@@ -263,10 +266,12 @@ export function stateAt(u: number, cameraZ: number, reducedMotion: boolean, out:
 	// Construction is a function of the position alone. Each exhibit builds while the camera approaches
 	// and its enclosure resolves last. Under reduced motion the camera only stands at rests, where all of it is complete.
 	if (!reducedMotion) {
-		out.engineeringBuild = span(u, 0.2, 0.372);
-		out.engineeringShell = step(u, 0.352, 0.4);
-		out.kensakuBuild = span(u, 0.515, 0.607);
-		out.kensakuShell = step(u, 0.592, 0.632);
+		// The frame stands before the camera rests, and the climber grows through it as the camera settles.
+		out.engineeringBuild = span(u, 0.2, 0.35);
+		out.engineeringGrowth = span(u, 0.342, 0.404);
+		// The instrument stands, and then its light is brought to a focus.
+		out.kensakuBuild = span(u, 0.515, 0.6);
+		out.kensakuFocus = step(u, 0.588, 0.634);
 		// Each ring assembles as the camera nears it and is closed 7 m before the camera arrives,
 		// so nothing moves across the opening the camera is about to use.
 		out.passage = u > T.kensaku[1] - 0.006 && cameraZ > RING_Z[2] - 6;
@@ -280,7 +285,7 @@ export const emptyState = (): JourneyState => ({
 	gate: 0, beam: 0, fogDensity: look.fog.density, white: 0, frost: 0, front: 0,
 	lab: true, engineering: false, kensaku: false, explore: false,
 	gather: 0, stream: 0, stage: false, disperse: 0, recede: 0, snow: 1, shift: 0,
-	engineeringBuild: 1, engineeringShell: 1, kensakuBuild: 1, kensakuShell: 1, passage: false, ringVeil: 1, rings: [1, 1, 1],
+	engineeringBuild: 1, engineeringGrowth: 1, kensakuBuild: 1, kensakuFocus: 1, passage: false, ringVeil: 1, rings: [1, 1, 1],
 	worldShift: 0, worldVeil: 0, season: 0,
 });
 export const emptyPose = (): Pose => ({ position: new THREE.Vector3(), target: new THREE.Vector3(), fov: 27 });

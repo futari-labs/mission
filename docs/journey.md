@@ -47,15 +47,15 @@ Positions are journey units. One lap is 1.28 units, about 10.9 screens of scroll
 | Position | What happens |
 | --- | --- |
 | 0.00 to 0.06 | The lab at rest. |
-| 0.06 to 0.36 | One continuous camera move: toward the light, between 二 and 人, along the beam to Exhibit 01. Each character slides aside as a whole. A frost front rises with block displacement and a color fringe, the view whites out inside the light, and clears into fog. From 0.20 the Engineering sculpture builds ahead of the camera, part by part. Its enclosure resolves from 0.35. |
+| 0.06 to 0.36 | One continuous camera move: toward the light, between 二 and 人, along the beam to Exhibit 01. Each character slides aside as a whole. A frost front rises with block displacement and a color fringe, the view whites out inside the light, and clears into fog. From 0.20 the Engineering arbor builds ahead of the camera, part by part, and its frame stands at 0.35. The climber then grows through it and flowers, from 0.34 to 0.40. |
 | 0.36 to 0.48 | Futari Engineering at rest. |
-| 0.48 to 0.60 | The camera passes beside the first enclosure and follows the beam. Kensaku's parts align from 0.515, and its enclosure resolves from 0.59. |
+| 0.48 to 0.60 | The camera passes beside the arbor and follows the beam. Kensaku's instrument is set up from 0.515 and stands at 0.60. From 0.59 to 0.63 its mirror turns to the sun, its iris opens, and the light comes to a point on one result. |
 | 0.60 to 0.72 | Kensaku at rest. |
 | 0.72 to 0.94 | The ring passage. The camera passes beside the lens, joins the line of the light, and goes through three stone rings that assemble ahead of it. Particles leave the lens along the beam and gather at the installation. |
 | 0.94 to 1.10 | Explore further at rest. Links select the particle form. |
 | 1.10 to 1.28 | The return. See below. Position 1.28 is position 0 of the next lap. |
 
-`docs/construction/README.md` describes the construction and the ring passage.
+`docs/construction/README.md` describes how parts assemble and the ring passage. `docs/exhibits/README.md` describes the two exhibits.
 
 The entrance is time-based and runs once per page load. If scrolling starts during it, it finishes at
 3.5 times speed instead of jumping. Later laps arrive at the finished landmark.
@@ -114,6 +114,7 @@ Start `pnpm preview`, then:
 | `node tools/motion-test.mjs` | Camera continuity for the entrance handoff, reversals, fast scroll, navigation, reload, resize. |
 | `node tools/perf.mjs` | Frame intervals, draw calls, and triangles for the opening, two laps downward, and one lap upward, plus resource counts. Headed by default. |
 | `node tools/scene-cost.mjs` | Draw calls, triangles, and frame intervals with the scene held still at each chapter and transition. `--dpr=2` and `--phone` set the frame. `--uncapped` stops waiting for the display, to compare the cost of two builds. |
+| `node tools/forms-sheet.mjs out.jpg` | The three particle forms at Explore, one frame each. |
 | `node tools/shimmer-check.mjs` | A proxy for foliage shimmer: how many pixels change sharply between frames a fraction of a pixel apart. |
 | `node tools/record.mjs docs/journey` | Records more than two laps scrolling downward only. Add `--join` for the upward crossing. |
 | `node tools/motion-sheet.mjs out.jpg` | Frames sampled from a live scroll, as one contact sheet. Positions may run past one lap. |

@@ -54,6 +54,7 @@ export class Engine {
 	private keyLight!: THREE.DirectionalLight;
 	private hemisphere!: THREE.HemisphereLight;
 	private sunDistance = 1;
+	private summerSky!: THREE.Texture;
 	private readonly transition: TransitionEffect;
 	private exhibits: ExhibitSet | null = null;
 	private explore: Explore | null = null;
@@ -151,6 +152,10 @@ export class Engine {
 		envScene.add(createSky(this.fog));
 		this.scene.environment = pmrem.fromScene(envScene, 0.02).texture;
 		this.scene.environmentIntensity = look.lights.environment;
+		// the same sky in summer's colour, for the bronze and glass of the exhibit that stands in summer
+		const summer = new THREE.Scene();
+		summer.add(createSky(new THREE.FogExp2(look.seasons[2].sky, 0)));
+		this.summerSky = pmrem.fromScene(summer, 0.02).texture;
 		pmrem.dispose();
 		const { hemisphere, key, rim } = look.lights;
 		this.hemisphere = new THREE.HemisphereLight(hemisphere.sky, hemisphere.ground, hemisphere.intensity);
@@ -231,7 +236,7 @@ export class Engine {
 	private async loadLater(): Promise<void> {
 		try {
 			// the banks and groves are not in the opening, so they load with the later chapters
-			const [exhibits] = await Promise.all([loadExhibits(), this.environment.load()]);
+			const exhibits = await loadExhibits(this.environment.load().then(() => this.environment.flora), this.environment.shared, this.summerSky);
 			const explore = new Explore(this.fog, exhibits.base);
 			await explore.load(this.coarse ? 9000 : 24000);
 			if (this.disposed) return;
@@ -452,11 +457,11 @@ export class Engine {
 			this.exhibits.engineering.visible = s.engineering;
 			this.exhibits.kensaku.visible = s.kensaku;
 			if (s.engineering) {
-				this.exhibits.engineering.assemble(s.engineeringBuild, s.engineeringShell);
+				this.exhibits.engineering.assemble(s.engineeringBuild, s.engineeringGrowth);
 				this.exhibits.engineering.update(dt, this.chapter === 'engineering' ? pointer : null, time);
 			}
 			if (s.kensaku) {
-				this.exhibits.kensaku.assemble(s.kensakuBuild, s.kensakuShell);
+				this.exhibits.kensaku.assemble(s.kensakuBuild, s.kensakuFocus);
 				this.exhibits.kensaku.update(dt, this.chapter === 'kensaku' ? pointer : null, time);
 			}
 		}
@@ -489,6 +494,7 @@ export class Engine {
 		this.explore?.dispose();
 		stoneUniforms.uDetail.value?.dispose();
 		this.scene.environment?.dispose();
+		this.summerSky.dispose();
 		this.composer.dispose();
 		this.renderer.dispose();
 	}
