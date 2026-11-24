@@ -177,7 +177,8 @@ Start `pnpm preview`, then:
 | `node tools/perf.mjs` | Frame intervals, draw calls, and triangles for the opening, two laps downward, and one lap upward, plus resource counts. Headed by default. |
 | `node tools/scene-cost.mjs` | Draw calls, triangles, and frame intervals with the scene held still at each chapter and transition. `--dpr=2` and `--phone` set the frame. `--uncapped` stops waiting for the display, to compare the cost of two builds. |
 | `node tools/forms-sheet.mjs out.jpg` | The three particle forms at Explore, one frame each. |
-| `node tools/shimmer-check.mjs` | A proxy for foliage shimmer: how many pixels change sharply between frames a fraction of a pixel apart. |
+| `node tools/shimmer-check.mjs` | A proxy for shimmer: how many pixels change sharply between frames one pixel of scroll apart. `--phone` takes the phone tier, `--query=msaa=0` adds experiment switches. |
+| `node tools/env-frames.mjs out-dir` | Still frames along the lap with the draw calls and triangles of each. `--diff dir-a dir-b` counts the pixels that differ between two sets, for showing that a change is pixel-identical. |
 | `node tools/record.mjs docs/journey` | Records more than two laps scrolling downward only. Add `--join` for the upward crossing. |
 | `node tools/motion-sheet.mjs out.jpg` | Frames sampled from a live scroll, as one contact sheet. Positions may run past one lap. |
 
