@@ -26,8 +26,10 @@ const wheel = async (total, perSecond) => {
 	const step = (perSecond / 60) * Math.sign(total);
 	for (let y = 0; Math.abs(y) < Math.abs(total); y += step) { await page.mouse.wheel(0, step); await page.waitForTimeout(16); }
 };
+// a chapter link is a journey at a scrolling pace: wait for it to arrive, then for the camera to settle
+const arrive = async () => { await page.waitForFunction(() => !window.__futari.navigation().active, null, { timeout: 30000 }); await page.waitForTimeout(1500); };
 const report = async (label, extra = {}) => console.log(label.padEnd(34), JSON.stringify({ ...(await jumps()), ...(await state()), ...extra }));
-// pixels of scrolling per journey unit. One lap is 1.16 units.
+// pixels of scrolling per journey unit
 const max = () => page.evaluate(() => window.__futari.unitPixels());
 
 await page.goto(`${base}/?probe`);
@@ -54,9 +56,9 @@ await reset(); await go(0.82); await page.waitForTimeout(700);
 await report('forward, inside ring passage');
 await reset(); await go(0.75); await go(0.9); await page.waitForTimeout(1000);
 await report('reverse and resume, ring passage');
-await reset(); await page.click('nav.chapters a[href="#explore"]'); await page.waitForTimeout(3500);
+await reset(); await page.click('nav.chapters a[href="#explore"]'); await arrive();
 await report('nav click: explore');
-await reset(); await page.click('nav.chapters a[href="#lab"]'); await page.waitForTimeout(4500);
+await reset(); await page.click('nav.chapters a[href="#lab"]'); await arrive();
 await report('nav click: lab');
 
 // reload mid-page: the browser restores the scroll position, and the scene must resolve to it

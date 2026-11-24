@@ -7,6 +7,7 @@
 // Nothing accumulates: the same input always gives the same result.
 import * as THREE from 'three';
 import { loadGlb, meshesOf } from './assets.ts';
+import { tag } from './experiment.ts';
 import { STATION } from './journey.ts';
 import { look } from './look.ts';
 import { adoptBake, createStoneMaterial, type Tone } from './materials.ts';
@@ -278,6 +279,7 @@ class Instrument extends Exhibit {
 			});
 			const mesh = new THREE.Mesh(tube, material);
 			mesh.frustumCulled = false;
+			tag(mesh, 'shafts');
 			mesh.renderOrder = 3;
 			this.shafts.push(material);
 			this.materials.push(material);

@@ -2,10 +2,14 @@
 // gather into one of three forms on a stone base, and move away from the pointer.
 import gsap from 'gsap';
 import * as THREE from 'three';
+import { tag } from './experiment.ts';
 import { STATION } from './journey.ts';
 import { look } from './look.ts';
 
 export const FORM_COUNT = 3;
+
+/** The asset build also writes the first this-many points of each form on their own. See tools/assets/build.ts. */
+const COARSE_PARTICLES = 9000;
 
 export class Explore {
 	readonly root = new THREE.Group();
@@ -59,8 +63,10 @@ export class Explore {
 	}
 
 	async load(count: number): Promise<void> {
-		const response = await fetch('/assets/particles.bin');
-		if (!response.ok) throw new Error(`particles.bin: ${response.status}`);
+		// a count the short file covers is served from it: the same points, without the ones that would go unused
+		const url = count <= COARSE_PARTICLES ? '/assets/particles-coarse.bin' : '/assets/particles.bin';
+		const response = await fetch(url);
+		if (!response.ok) throw new Error(`${url}: ${response.status}`);
 		const all = new Int16Array(await response.arrayBuffer());
 		const total = all.length / 9;
 		const n = Math.min(count, total);
@@ -143,7 +149,7 @@ export class Explore {
 		});
 		this.points = new THREE.Points(geometry, material);
 		this.points.frustumCulled = false;
-		this.root.add(this.points);
+		this.root.add(tag(this.points, 'particles'));
 	}
 
 	/** Morphs to another form. Safe to call repeatedly with the same index. */

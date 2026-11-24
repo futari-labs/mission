@@ -1,0 +1,9 @@
+entrance                   {"frames":4,"mean":51.5,"p50":84.5,"p95":105.5,"p99":105.5,"max":105.5,"over33ms":2,"calls":46,"triangles":507024,"slowAt":["-0.000 (85 ms)","-0.000 (106 ms)"]}
+environment                {"chrome":"158.0.8127.88","headless":true,"viewport":{"width":402,"height":874},"dpr":1.75,"canvas":[402,874],"drawingBuffer":[null,null],"sceneVisibleAfterMs":291}
+loading                    [{"name":"Engine-DvJQAUNR.js","kb":233,"ms":101},{"name":"landscape.glb","kb":1266,"ms":199},{"name":"exhibits.glb","kb":1812,"ms":200},{"name":"terrain.glb","kb":1896,"ms":200},{"name":"landmark.glb","kb":930,"ms":202},{"name":"foliage.png","kb":177,"ms":201},{"name":"stone-detail.png","kb":175,"ms":201},{"name":"particles.bin","kb":422,"ms":277}]
+rest, 3 s                  {"frames":181,"mean":16.7,"p50":16.7,"p95":18.5,"p99":19.3,"max":19.4,"over33ms":0,"calls":46,"triangles":507024}
+pointer sweeps             {"frames":240,"mean":16.7,"p50":16.7,"p95":18.6,"p99":19.4,"max":55.2,"over33ms":1,"calls":46,"triangles":507024,"slowAt":["-0.000 (55 ms)"]}
+lap 1, downward            {"frames":1993,"mean":16.7,"p50":16.7,"p95":18.9,"p99":20.1,"max":34.6,"over33ms":1,"calls":46,"triangles":507024,"slowAt":["0.378 (35 ms)"]}
+lap 2, downward            {"frames":1995,"mean":16.7,"p50":16.6,"p95":19,"p99":20.3,"max":22.3,"over33ms":0,"calls":46,"triangles":507024}
+one lap upward             {"frames":1994,"mean":16.7,"p50":16.6,"p95":19.1,"p99":20.3,"max":21.6,"over33ms":0,"calls":46,"triangles":507024}
+resources                  {"programs":[51,51],"geometries":[100,100],"textures":[29,29],"requests":15,"heapMB":42,"rebases":4}

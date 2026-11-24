@@ -1,33 +1,10 @@
 // Depth cues between the layers: drifting snow and slow banks of mist.
 import * as THREE from 'three';
+import { tag } from './experiment.ts';
+import { valueNoise } from './noise.ts';
 
 function valueNoiseTexture(size: number, seed: number): THREE.DataTexture {
-	let s = seed;
-	const rand = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
-	const grid = 16;
-	const lattice = Array.from({ length: 4 }, (_, o) => Float32Array.from({ length: (grid << o) ** 2 }, rand));
-	const data = new Uint8Array(size * size);
-	for (let y = 0; y < size; y++)
-		for (let x = 0; x < size; x++) {
-			let v = 0;
-			let amp = 0.5;
-			for (let o = 0; o < 4; o++) {
-				const n = grid << o;
-				const fx = (x / size) * n;
-				const fy = (y / size) * n;
-				const x0 = Math.floor(fx);
-				const y0 = Math.floor(fy);
-				const tx = fx - x0;
-				const ty = fy - y0;
-				const sx = tx * tx * (3 - 2 * tx);
-				const sy = ty * ty * (3 - 2 * ty);
-				const at = (i: number, j: number) => lattice[o][(j % n) * n + (i % n)];
-				v += amp * ((at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx) * (1 - sy) + (at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx) * sy);
-				amp *= 0.5;
-			}
-			data[y * size + x] = Math.round(v * 255);
-		}
-	const t = new THREE.DataTexture(data, size, size, THREE.RedFormat);
+	const t = new THREE.DataTexture(valueNoise(size, 16, 4, seed), size, size, THREE.RedFormat);
 	t.wrapS = t.wrapT = THREE.RepeatWrapping;
 	t.minFilter = t.magFilter = THREE.LinearFilter;
 	t.needsUpdate = true;
@@ -93,7 +70,7 @@ export class Atmosphere {
 		});
 		const points = new THREE.Points(geometry, material);
 		points.frustumCulled = false;
-		return points;
+		return tag(points, 'particles');
 	}
 
 	private bank(x: number, y: number, z: number, w: number, h: number, opacity: number, speed: number): THREE.Mesh {
@@ -121,7 +98,7 @@ export class Atmosphere {
 		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
 		mesh.position.set(x, y, z);
 		mesh.renderOrder = 5;
-		return mesh;
+		return tag(mesh, 'mist');
 	}
 
 	set reveal(v: number) {

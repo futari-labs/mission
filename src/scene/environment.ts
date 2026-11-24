@@ -11,7 +11,9 @@
 // The return moves this whole group along z. Every pattern is therefore placed in the group's own
 // coordinates (world position less `uShift`), so cloud, snow line, and falling leaves move with it.
 import * as THREE from 'three';
+import { tag } from './experiment.ts';
 import { look } from './look.ts';
+import { valueNoise } from './noise.ts';
 import { SKY_GLSL } from './sky.ts';
 import { Grove } from './vegetation.ts';
 
@@ -91,30 +93,7 @@ function ridgeGeometry(layer: number): THREE.BufferGeometry {
 }
 
 function cloudTexture(size: number): THREE.DataTexture {
-	let s = 20260;
-	const rand = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
-	const grid = 8;
-	const lattice = Array.from({ length: 5 }, (_, o) => Float32Array.from({ length: (grid << o) ** 2 }, rand));
-	const data = new Uint8Array(size * size);
-	for (let y = 0; y < size; y++)
-		for (let x = 0; x < size; x++) {
-			let v = 0;
-			let amp = 0.5;
-			for (let o = 0; o < 5; o++) {
-				const n = grid << o;
-				const fx = (x / size) * n;
-				const fy = (y / size) * n;
-				const x0 = Math.floor(fx);
-				const y0 = Math.floor(fy);
-				const sx = (fx - x0) ** 2 * (3 - 2 * (fx - x0));
-				const sy = (fy - y0) ** 2 * (3 - 2 * (fy - y0));
-				const at = (i: number, j: number) => lattice[o][(j % n) * n + (i % n)];
-				v += amp * ((at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx) * (1 - sy) + (at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx) * sy);
-				amp *= 0.5;
-			}
-			data[y * size + x] = Math.round(v * 255);
-		}
-	const t = new THREE.DataTexture(data, size, size, THREE.RedFormat);
+	const t = new THREE.DataTexture(valueNoise(size, 8, 5, 20260), size, size, THREE.RedFormat);
 	t.wrapS = t.wrapT = THREE.RepeatWrapping;
 	t.minFilter = THREE.LinearMipmapLinearFilter;
 	t.magFilter = THREE.LinearFilter;
@@ -219,7 +198,7 @@ export class Environment {
 			const mesh = new THREE.Mesh(ridgeGeometry(i), material);
 			mesh.frustumCulled = false;
 			mesh.renderOrder = -6 + i * -1;
-			this.root.add(mesh);
+			this.root.add(tag(mesh, 'ridges'));
 		});
 		// The banks and groves belong to the growing seasons. In winter the opening's own terrain stands
 		// where they are, so they fade out into the sky and stop being drawn.
@@ -263,11 +242,11 @@ export class Environment {
 			deck.position.set(CENTRE.x, height, CENTRE.z);
 			deck.renderOrder = -4;
 			deck.frustumCulled = false;
-			this.root.add(deck);
+			this.root.add(tag(deck, 'clouds'));
 		}
 		// each bank is a large blended quad, and they overlap toward the horizon: a few is all the frame can afford
-		this.root.add(this.banks(coarse ? 9 : 16));
-		this.snow = this.snowfall(coarse ? 450 : 1000);
+		this.root.add(tag(this.banks(coarse ? 9 : 16), 'clouds'));
+		this.snow = tag(this.snowfall(coarse ? 450 : 1000), 'particles');
 		this.root.add(this.snow);
 	}
 
@@ -464,9 +443,14 @@ export class Environment {
 		return this.grove;
 	}
 
+	/** Tells the foliage whether the frame is multisampled. Without samples, leaf cards cut their own edges. */
+	setMultisampled(on: boolean): void {
+		this.grove.setMultisampled(on);
+	}
+
 	/** Draws the banks and groves for one offscreen frame, so they are compiled before spring needs them. */
 	warm(on: boolean): void {
-		this.grove.root.visible = on;
+		this.grove.warm(on);
 	}
 
 	dispose(): void {

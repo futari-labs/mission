@@ -1,14 +1,16 @@
 // Measures frame intervals (time between animation frames as seen by the page, not GPU time),
 // draw calls, triangles, and loading for the opening and, when the page scrolls, the full journey.
+// --phone is a phone-sized frame with touch emulation on this machine's GPU. It is not a phone.
 // Usage: node tools/perf.mjs [base-url] [--headless] [--dpr=2] [--phone]
 import { chromium } from 'playwright-core';
 
 const base = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'http://localhost:4173';
 const headless = process.argv.includes('--headless');
 const phone = process.argv.includes('--phone');
-const dpr = Number(process.argv.find((a) => a.startsWith('--dpr='))?.slice(6) ?? (phone ? 2 : 1));
+const dpr = Number(process.argv.find((a) => a.startsWith('--dpr='))?.slice(6) ?? (phone ? 3 : 1));
 const browser = await chromium.launch({ channel: 'chrome', headless, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
-const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+// the phone frame is an iPhone 17 Pro's: 402x874 CSS pixels at 3x
+const viewport = phone ? { width: 402, height: 874 } : { width: 1440, height: 900 };
 const context = await browser.newContext({ viewport, deviceScaleFactor: dpr, isMobile: phone, hasTouch: phone });
 const page = await context.newPage();
 
@@ -32,13 +34,14 @@ const take = async (label) => {
 
 const t0 = Date.now();
 await page.goto(`${base}/?probe`);
-await page.waitForFunction(() => window.__futari?.state === 'entering', null, { timeout: 30000 });
+// a build that skips the entrance goes straight to ready
+await page.waitForFunction(() => ['entering', 'ready'].includes(window.__futari?.state), null, { timeout: 30000 });
 const enteringAt = Date.now() - t0;
 await page.evaluate(() => window.__futariProbe.frames.splice(0));
 await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
 const stats = await take('entrance');
 const load = await page.evaluate(() => performance.getEntriesByType('resource').filter((r) => /assets\/.*\.(glb|png|bin)|Engine/.test(r.name)).map((r) => ({ name: r.name.split('/').pop().slice(0, 28), kb: Math.round(r.transferSize / 1024), ms: Math.round(r.responseEnd) })));
-console.log('environment'.padEnd(26), JSON.stringify({ chrome: browser.version(), headless, viewport, dpr: stats.dpr, canvas: [stats.width, stats.height], sceneVisibleAfterMs: enteringAt }));
+console.log('environment'.padEnd(26), JSON.stringify({ chrome: browser.version(), headless, viewport, dpr: stats.dpr, canvas: [stats.width, stats.height], drawingBuffer: [stats.bufferWidth, stats.bufferHeight], tier: stats.tierName, samples: stats.msaa, sceneVisibleAfterMs: enteringAt }));
 console.log('loading'.padEnd(26), JSON.stringify(load));
 
 await page.waitForTimeout(1500);
@@ -71,6 +74,6 @@ if (lap > 50) {
 	await scroll(1, 'lap 2, downward');
 	await scroll(-1, 'one lap upward');
 	const after = await page.evaluate(() => ({ ...window.__futariProbe.stats(), requests: performance.getEntriesByType('resource').length, heapMB: Math.round((performance.memory?.usedJSHeapSize ?? 0) / 1e6) }));
-	console.log('resources'.padEnd(26), JSON.stringify({ programs: [before.programs, after.programs], geometries: [before.geometries, after.geometries], textures: [before.textures, after.textures], requests: after.requests, heapMB: after.heapMB, rebases: after.rebases }));
+	console.log('resources'.padEnd(26), JSON.stringify({ programs: [before.programs, after.programs], geometries: [before.geometries, after.geometries], textures: [before.textures, after.textures], requests: after.requests, heapMB: after.heapMB, rebases: after.rebases, tierAtEnd: after.tierName, governor: after.governor }));
 }
 await browser.close();

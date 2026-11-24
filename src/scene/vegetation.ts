@@ -10,7 +10,8 @@
 // environment. Surface patterns are placed in the environment's own coordinates, so they stay
 // attached to the ground when the return moves the world.
 import * as THREE from 'three';
-import { loadGlb, meshesOf } from './assets.ts';
+import { loadGlb, loadPixels, meshesOf } from './assets.ts';
+import { tag } from './experiment.ts';
 import { look } from './look.ts';
 import { SKY_GLSL } from './sky.ts';
 
@@ -20,20 +21,43 @@ const LAYERS = 5;
 
 type Uniforms = Record<string, THREE.IUniform>;
 
+/**
+ * How deep along the corridor one batch of plants reaches, in metres. Measured along the lap, 40 m
+ * leaves out nearly as many triangles as culling plant by plant, for about a third of the draw calls.
+ */
+const BATCH_DEPTH = 40;
+
+/**
+ * How far a leaf card reaches beyond the point its four corners share: the card's half-diagonal at
+ * the plant's size, and the sway of the air. The vertex shader moves the corners out, so the mesh's
+ * own bounds, taken from those shared points, are too small by this much.
+ */
+const cardMargin = (reach: number, scale: number) => Math.SQRT2 * reach * scale + 0.05 * scale;
+
+/** A geometry that draws the same vertex buffers as another, with room for attributes of its own. */
+function shareGeometry(source: THREE.BufferGeometry): THREE.BufferGeometry {
+	const geometry = new THREE.BufferGeometry();
+	for (const [name, attribute] of Object.entries(source.attributes)) geometry.setAttribute(name, attribute);
+	geometry.setIndex(source.index);
+	geometry.boundingSphere = source.boundingSphere?.clone() ?? null;
+	geometry.boundingBox = source.boundingBox?.clone() ?? null;
+	return geometry;
+}
+
+/** The alpha below which a pixel of a leaf card is dropped: in a multisampled frame, and in one with a single sample per pixel. */
+const CUT = { coverage: 0.04, single: 0.5 } as const;
+
 /** Cuts a tall image of square layers into a texture array, so each layer tiles and mipmaps on its own. */
 async function loadLayers(url: string, colour: boolean): Promise<{ texture: THREE.DataArrayTexture; mean: THREE.Vector3[] }> {
-	const image = await new THREE.ImageLoader().loadAsync(url);
-	const size = image.width;
-	const canvas = document.createElement('canvas');
-	canvas.width = size;
-	canvas.height = size * LAYERS;
-	const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-	ctx.drawImage(image, 0, 0);
-	const data = new Uint8Array(ctx.getImageData(0, 0, size, size * LAYERS).data.buffer);
+	const pixels = await loadPixels(url);
+	const size = pixels.width;
+	const data = new Uint8Array(pixels.data.buffer);
 	// the mean colour of each layer, in linear light: the shaders keep a photograph's detail and replace its average
+	// a byte has 256 values, so the curve is worked out once for each and not once for every sample
+	const linear = Float64Array.from({ length: 256 }, (_, v) => (v / 255) ** 2.2);
 	const mean = Array.from({ length: LAYERS }, (_, l) => {
 		const sum = [0, 0, 0];
-		for (let i = l * size * size * 4; i < (l + 1) * size * size * 4; i += 64) for (let c = 0; c < 3; c++) sum[c] += (data[i + c] / 255) ** 2.2;
+		for (let i = l * size * size * 4; i < (l + 1) * size * size * 4; i += 64) for (let c = 0; c < 3; c++) sum[c] += linear[data[i + c]];
 		return new THREE.Vector3(...sum).multiplyScalar(16 / (size * size));
 	});
 	const texture = new THREE.DataArrayTexture(data, size, size, LAYERS);
@@ -87,7 +111,6 @@ const BANK_VERTEX = /* glsl */ `
 
 const BANK_FRAGMENT = /* glsl */ `
 	uniform mediump sampler2DArray uLand;
-	uniform mediump sampler2DArray uLandNormal;
 	uniform sampler2D uNoise;
 	uniform vec3 uMean[${LAYERS}];
 	uniform vec3 uRock, uGrass, uGround, uLeafA, uLeafB;
@@ -103,9 +126,13 @@ const BANK_FRAGMENT = /* glsl */ `
 		float l = dot(rel, vec3(0.3, 0.5, 0.2));
 		return want * mix(vec3(l), rel, keep);
 	}
-	vec2 bump(vec2 uv, int layer) {
-		return texture(uLandNormal, vec3(uv, float(layer))).xy * 2.0 - 1.0;
-	}
+	#ifdef FINE
+		// the relief is read only here, so a build without it never loads the texture
+		uniform mediump sampler2DArray uLandNormal;
+		vec2 bump(vec2 uv, int layer) {
+			return texture(uLandNormal, vec3(uv, float(layer))).xy * 2.0 - 1.0;
+		}
+	#endif
 	void main() {
 		vec3 n = normalize(vNormal);
 		vec3 p = vLand;
@@ -178,7 +205,9 @@ const WOOD_VERTEX = /* glsl */ `
 
 const WOOD_FRAGMENT = /* glsl */ `
 	uniform mediump sampler2DArray uLand;
-	uniform mediump sampler2DArray uLandNormal;
+	#ifdef FINE
+		uniform mediump sampler2DArray uLandNormal;
+	#endif
 	uniform vec3 uMean[${LAYERS}];
 	uniform vec3 uBark;
 	uniform float uStem;
@@ -244,6 +273,7 @@ const CARD_VERTEX = /* glsl */ `
 const CARD_FRAGMENT = /* glsl */ `
 	uniform sampler2D uFoliage;
 	uniform vec3 uLeafA, uLeafB, uLeafC, uPetal, uPetalDeep;
+	uniform float uCut;
 	varying vec3 vWorld;
 	varying vec3 vNormal;
 	varying vec2 vUv;
@@ -258,7 +288,10 @@ const CARD_FRAGMENT = /* glsl */ `
 		vec4 t = texture2D(uFoliage, vUv, -1.0);
 		float a = t.a * (1.0 + 0.5 * lod);
 		a = clamp((a - 0.44) / max(fwidth(a), 0.06) + 0.5, 0.0, 1.0);
-		if (a < 0.04) discard;
+		// With multisampling the alpha becomes coverage, and only the empty part of a card is dropped.
+		// With one sample per pixel there is no coverage, so the edge is cut where it is half covered:
+		// the same outline, without the ramp. Cutting any lower draws every leaf a pixel fat.
+		if (a < uCut) discard;
 
 		vec3 col;
 		if (vBake.a > 0.5) {
@@ -298,6 +331,8 @@ export class Grove {
 	private readonly own: Uniforms;
 	private readonly textures: THREE.Texture[] = [];
 	private defines: Record<string, string | number> = {};
+	private readonly cards: THREE.ShaderMaterial[] = [];
+	private multisampled = true;
 
 	/** `shared` are the environment's uniforms: season, light, sky, veil, and the shift of the return. */
 	constructor(shared: Uniforms, coarse: boolean) {
@@ -314,31 +349,37 @@ export class Grove {
 			/** How much a plant in blossom holds its leaves back, and how much of each stem shows: the trees are whole. */
 			uHold: { value: 0.62 },
 			uStem: { value: 2 },
+			uCut: { value: CUT.coverage },
 		};
 		// in winter the opening's own terrain stands here instead
 		this.root.visible = false;
 	}
 
 	async load(): Promise<void> {
+		// Surface relief costs several texture reads per pixel, which a phone's fill rate should keep.
+		// Without it nothing samples the relief, so it is not fetched, decoded, or uploaded either.
+		const fine = !this.coarse;
 		const [gltf, albedo, normal, foliage] = await Promise.all([
 			loadGlb('/assets/landscape.glb'),
 			loadLayers('/assets/land-albedo.jpg', true),
-			loadLayers('/assets/land-normal.jpg', false),
+			fine ? loadLayers('/assets/land-normal.jpg', false) : null,
 			new THREE.TextureLoader().loadAsync('/assets/foliage.png'),
 		]);
 		foliage.colorSpace = THREE.NoColorSpace;
 		foliage.anisotropy = 4;
 		foliage.flipY = false;
-		this.textures.push(albedo.texture, normal.texture, foliage);
+		this.textures.push(albedo.texture, foliage);
 		this.own.uLand.value = albedo.texture;
-		this.own.uLandNormal.value = normal.texture;
+		if (normal) {
+			this.textures.push(normal.texture);
+			this.own.uLandNormal.value = normal.texture;
+		}
 		this.own.uFoliage.value = foliage;
 		this.own.uMean.value = albedo.mean;
 
 		const extras = gltf.scene.userData as { species: string[]; uvTiles: number; cardReach: number; plants: number[][] };
 		this.defines = { UV_TILES: extras.uvTiles, CARD_REACH: extras.cardReach };
-		// surface relief costs several texture reads per pixel, which a phone's fill rate should keep
-		if (!this.coarse) this.defines.FINE = 1;
+		if (fine) this.defines.FINE = 1;
 		const material = this.material;
 		const meshes = meshesOf(gltf.scene);
 		gltf.scene.updateMatrixWorld(true);
@@ -351,10 +392,8 @@ export class Grove {
 		const ground = material(BANK_VERTEX, BANK_FRAGMENT);
 		for (const mesh of meshes.filter((m) => m.name.startsWith('bank_'))) {
 			bake(mesh).material = ground;
-			// never culled, so every bank reaches the GPU in the warm-up frame and none arrives mid-journey
-			mesh.frustumCulled = false;
 			mesh.renderOrder = -5;
-			this.root.add(mesh);
+			this.root.add(tag(mesh, 'banks'));
 		}
 
 		// A touch device draws the distant mesh of every species, and leaves out a share of the plants.
@@ -362,29 +401,56 @@ export class Grove {
 		const place = new THREE.Matrix4();
 		const turn = new THREE.Quaternion();
 		const up = new THREE.Vector3(0, 1, 0);
+		// Each kind of plant is drawn in batches, one per stretch of the corridor and side of it, so the
+		// camera's frustum can leave out the groves it has passed and the ones beside a narrow frame.
+		const cell = (p: number[]) => `${p[2] < 0 ? 'w' : 'e'}${Math.floor(p[4] / BATCH_DEPTH)}`;
 		extras.species.forEach((species, s) => {
 			const { wood, cards } = this.plantMaterials(look.environment.bark[s]);
 			for (const detail of [0, 1]) {
-				const here = plants.filter((p) => p[0] === s && (this.coarse ? 1 : p[1]) === detail);
-				if (here.length === 0) continue;
-				const data = new Float32Array(here.length * 4);
+				const batches = new Map<string, number[][]>();
+				for (const p of plants) {
+					if (p[0] !== s || (this.coarse ? 1 : p[1]) !== detail) continue;
+					const key = cell(p);
+					batches.set(key, [...(batches.get(key) ?? []), p]);
+				}
 				for (const [part, mat] of [['wood', wood], ['cards', cards]] as const) {
+					if (batches.size === 0) continue;
 					const source = bake(meshes.find((m) => m.name === `${species}_${detail}_${part}`)!);
-					const mesh = new THREE.InstancedMesh(source.geometry, mat, here.length);
-					here.forEach((p, i) => {
-						// the mesh is stored quantized, and its own transform restores its size
-						place.compose(new THREE.Vector3(p[2], p[3], p[4]), turn.setFromAxisAngle(up, p[5]), new THREE.Vector3(p[6], p[6], p[6])).multiply(source.matrixWorld);
-						mesh.setMatrixAt(i, place);
-						data.set([p[7], p[8], p[9], p[6]], i * 4);
-					});
-					mesh.geometry.setAttribute('aPlant', new THREE.InstancedBufferAttribute(data, 4));
-					if (part === 'cards') keepAlpha(mesh);
-					mesh.frustumCulled = false;
-					mesh.renderOrder = -5;
-					this.root.add(mesh);
+					source.geometry.computeBoundingSphere();
+					for (const here of batches.values()) {
+						// the batches of one mesh share its vertex buffers, and differ only in which plants they place
+						const geometry = shareGeometry(source.geometry);
+						const mesh = new THREE.InstancedMesh(geometry, mat, here.length);
+						const data = new Float32Array(here.length * 4);
+						let largest = 0;
+						here.forEach((p, i) => {
+							// the mesh is stored quantized, and its own transform restores its size
+							place.compose(new THREE.Vector3(p[2], p[3], p[4]), turn.setFromAxisAngle(up, p[5]), new THREE.Vector3(p[6], p[6], p[6])).multiply(source.matrixWorld);
+							mesh.setMatrixAt(i, place);
+							data.set([p[7], p[8], p[9], p[6]], i * 4);
+							largest = Math.max(largest, p[6]);
+						});
+						geometry.setAttribute('aPlant', new THREE.InstancedBufferAttribute(data, 4));
+						mesh.computeBoundingSphere();
+						if (part === 'cards') {
+							keepAlpha(mesh);
+							mesh.boundingSphere!.radius += cardMargin(extras.cardReach, largest);
+						}
+						mesh.renderOrder = -5;
+						this.root.add(tag(mesh, part === 'cards' ? 'foliage' : 'wood'));
+					}
 				}
 			}
 		});
+	}
+
+	/**
+	 * While warming, nothing here is culled, so every bank and every batch of plants reaches the GPU
+	 * in the one offscreen frame and none of them uploads when it first comes into view mid-journey.
+	 */
+	warm(on: boolean): void {
+		this.root.visible = on;
+		for (const child of this.root.children) child.frustumCulled = !on;
 	}
 
 	private material = (vertexShader: string, fragmentShader: string, more: Uniforms = {}) =>
@@ -395,8 +461,20 @@ export class Grove {
 		const wood = this.material(WOOD_VERTEX, WOOD_FRAGMENT, { uBark: { value: new THREE.Color(bark) }, ...own });
 		const cards = this.material(CARD_VERTEX, CARD_FRAGMENT, own);
 		// edges of leaves are resolved by multisampling, not by blending, so they need no sorting
-		cards.alphaToCoverage = true;
+		cards.alphaToCoverage = this.multisampled;
+		this.cards.push(cards);
 		return { wood, cards };
+	}
+
+	/**
+	 * Whether the frame the cards are drawn into is multisampled. When it is not, alpha cannot become
+	 * coverage, so every card, the climber's included, cuts its own edge instead. The switch is one
+	 * uniform and one GL state: nothing recompiles.
+	 */
+	setMultisampled(on: boolean): void {
+		this.multisampled = on;
+		this.own.uCut.value = on ? CUT.coverage : CUT.single;
+		for (const material of this.cards) material.alphaToCoverage = on;
 	}
 
 	/**
@@ -417,8 +495,11 @@ export class Grove {
 			mesh.setMatrixAt(0, source.matrixWorld);
 			// leafs on time, a middling tint, flowers fully, and is its own size
 			mesh.geometry.setAttribute('aPlant', new THREE.InstancedBufferAttribute(new Float32Array([0.5, 0.45, 1, 1]), 4));
-			mesh.frustumCulled = false;
-			if (source === cardMesh) keepAlpha(mesh);
+			mesh.computeBoundingSphere();
+			if (source === cardMesh) {
+				keepAlpha(mesh);
+				mesh.boundingSphere!.radius += cardMargin(Number(this.defines.CARD_REACH), 1);
+			}
 			group.add(mesh);
 		}
 		return group;

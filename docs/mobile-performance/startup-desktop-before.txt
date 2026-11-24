@@ -1,0 +1,19 @@
+# before (main, 1b37617, plus the experiment switches): 1440x900, desktop, 5 loads with an empty cache. Milliseconds, median [range]. Desktop CPU and GPU.
+scene first shown after                     334  [330-352]
+script in the first frame                    54  [54-62]
+frames over 34 ms until the entrance ends     2  [2-2]
+longest frame until the entrance ends       100  [99-120]
+time in frames over 34 ms                   156  [155-184]
+longest frame on first arrival at 0.3        19  [19-21]
+longest frame on first arrival at 0.43       19  [18-19]
+longest frame on first arrival at 0.67       19  [18-21]
+longest frame on first arrival at 0.8        19  [18-20]
+longest frame on first arrival at 1.02       19  [19-20]
+longest frame on first arrival at 1.19       20  [19-24]
+shader programs after the entrance           50  [50-50]
+slow frames of each load (frame number: interval):
+  #2: 64  #3: 120
+  #2: 56  #4: 101
+  #2: 56  #3: 100
+  #2: 56  #3: 99
+  #2: 55  #3: 99

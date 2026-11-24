@@ -49,9 +49,13 @@ dd {
 	padding: 0;
 }
 
+/* As tall as the viewport gets with the browser's toolbar away. A phone's toolbar sliding in or out
+   then covers or uncovers the bottom of the canvas and never resizes it, so the drawing buffers
+   are not rebuilt in the middle of a scroll. Where lvh is unknown the canvas follows the window. */
 .scene {
 	position: fixed;
 	inset: 0;
+	height: 100lvh;
 	opacity: 0;
 	transition: opacity 0.9s ease;
 }

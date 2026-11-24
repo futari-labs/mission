@@ -1,8 +1,8 @@
 import { type FocusEvent, type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { mark } from './content/mark.ts';
 import { site } from './content/site.ts';
-import { CHAPTERS, type ChapterId, CYCLE, chapterAt, RETURN_FROM, unitsOf } from './journey/chapters.ts';
-import { goToChapter, initTravel, lapPixels, placeTravel, readTravel, trackHeight } from './journey/travel.ts';
+import { CHAPTERS, type ChapterId, CYCLE, chapterAt, NAVIGATION_EASE_IN_SECONDS, NAVIGATION_EASE_OUT_SECONDS, NAVIGATION_SCREENS_PER_SECOND, RETURN_FROM, SCREENS_PER_UNIT, unitsOf } from './journey/chapters.ts';
+import { goToChapter, initTravel, lapPixels, type NavigationState, navigationState, placeTravel, readTravel, trackHeight } from './journey/travel.ts';
 import type { Engine, EngineState } from './scene/Engine.ts';
 
 type Phase = EngineState | 'unavailable';
@@ -18,8 +18,10 @@ declare global {
 			/** Jumps to a position in journey units. */
 			jump: (units: number) => void;
 			unitPixels: () => number;
-			/** The lap as the tools need it: its length, where the return starts, and each chapter's rest. */
-			map: { cycle: number; returnFrom: number; rests: Record<ChapterId, number> };
+			/** The automatic journey a chapter link starts: whether one is running, where to, and how the last one ended. */
+			navigation: () => NavigationState;
+			/** The lap as the tools need it: its length, where the return starts, each chapter's rest, and the pace of a chapter link. */
+			map: { cycle: number; returnFrom: number; rests: Record<ChapterId, number>; screensPerUnit: number; pace: { screensPerSecond: number; easeInSeconds: number; easeOutSeconds: number } };
 		};
 	}
 }
@@ -73,7 +75,14 @@ export function App() {
 				units: () => readTravel() * CYCLE,
 				jump: (units) => placeTravel(units / CYCLE),
 				unitPixels: () => lapPixels() / CYCLE,
-				map: { cycle: CYCLE, returnFrom: RETURN_FROM, rests: Object.fromEntries(CHAPTERS.map((c) => [c.id, c.rest])) as Record<ChapterId, number> },
+				navigation: () => ({ ...navigationState() }),
+				map: {
+					cycle: CYCLE,
+					returnFrom: RETURN_FROM,
+					rests: Object.fromEntries(CHAPTERS.map((c) => [c.id, c.rest])) as Record<ChapterId, number>,
+					screensPerUnit: SCREENS_PER_UNIT,
+					pace: { screensPerSecond: NAVIGATION_SCREENS_PER_SECOND, easeInSeconds: NAVIGATION_EASE_IN_SECONDS, easeOutSeconds: NAVIGATION_EASE_OUT_SECONDS },
+				},
 			});
 		const report = (next: Phase) => {
 			if (cancelled) return;

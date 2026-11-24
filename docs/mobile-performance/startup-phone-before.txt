@@ -1,0 +1,19 @@
+# before (main, 1b37617, plus the experiment switches). It skips the entrance at this frame size: 402x874, touch emulation at 3x, 5 loads with an empty cache. Milliseconds, median [range]. Desktop CPU and GPU.
+scene first shown after                     283  [280-301]
+script in the first frame                    69  [59-74]
+frames over 34 ms until the entrance ends     1  [1-2]
+longest frame until the entrance ends        73  [62-108]
+time in frames over 34 ms                    73  [62-185]
+longest frame on first arrival at 0.3        19  [18-19]
+longest frame on first arrival at 0.43       19  [18-20]
+longest frame on first arrival at 0.67       19  [18-20]
+longest frame on first arrival at 0.8        19  [19-20]
+longest frame on first arrival at 1.02       19  [18-20]
+longest frame on first arrival at 1.19       19  [19-23]
+shader programs after the entrance           50  [47-50]
+slow frames of each load (frame number: interval):
+  #2: 77  #3: 108
+  #2: 62
+  #2: 73
+  #2: 73
+  #2: 67

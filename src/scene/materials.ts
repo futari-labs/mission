@@ -2,6 +2,7 @@
 // and the timber and bronze of the exhibits. All read baked vertex data (occlusion, wear or snow,
 // tint) and add tiling grain by position, so no mesh needs UVs.
 import * as THREE from 'three';
+import { loadPixels } from './assets.ts';
 import { look } from './look.ts';
 
 export const stoneUniforms = {
@@ -14,26 +15,27 @@ export const stoneUniforms = {
 
 /** Turns the grayscale grain height map into a texture with a normal in RG and height in B. */
 export async function loadDetailTexture(url: string): Promise<THREE.DataTexture> {
-	const image = await new THREE.ImageLoader().loadAsync(url);
-	const size = image.width;
-	const canvas = document.createElement('canvas');
-	canvas.width = canvas.height = size;
-	const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-	ctx.drawImage(image, 0, 0);
-	const src = ctx.getImageData(0, 0, size, size).data;
+	const { data: src, width: size } = await loadPixels(url);
 	const out = new Uint8Array(size * size * 4);
-	const h = (x: number, y: number) => src[(((y + size) % size) * size + ((x + size) % size)) * 4] / 255;
-	for (let y = 0; y < size; y++)
+	const height = new Float64Array(size * size);
+	for (let i = 0; i < height.length; i++) height[i] = src[i * 4] / 255;
+	for (let y = 0; y < size; y++) {
+		// the map tiles, so the slope at an edge is taken across to the other side
+		const row = y * size;
+		const above = ((y + size - 1) % size) * size;
+		const below = ((y + 1) % size) * size;
 		for (let x = 0; x < size; x++) {
-			const dx = (h(x + 1, y) - h(x - 1, y)) * 3.2;
-			const dy = (h(x, y + 1) - h(x, y - 1)) * 3.2;
-			const l = Math.hypot(dx, dy, 1);
-			const i = (y * size + x) * 4;
-			out[i] = Math.round((-dx / l) * 127.5 + 127.5);
-			out[i + 1] = Math.round((-dy / l) * 127.5 + 127.5);
+			const dx = (height[row + ((x + 1) % size)] - height[row + ((x + size - 1) % size)]) * 3.2;
+			const dy = (height[below + x] - height[above + x]) * 3.2;
+			const l = Math.sqrt(dx * dx + dy * dy + 1);
+			const i = (row + x) * 4;
+			// storing into bytes drops the fraction, so the half added here rounds to the nearest level
+			out[i] = (-dx / l) * 127.5 + 128;
+			out[i + 1] = (-dy / l) * 127.5 + 128;
 			out[i + 2] = src[i];
 			out[i + 3] = 255;
 		}
+	}
 	const texture = new THREE.DataTexture(out, size, size, THREE.RGBAFormat);
 	texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
 	texture.minFilter = THREE.LinearMipmapLinearFilter;

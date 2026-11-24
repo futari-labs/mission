@@ -1,0 +1,35 @@
+# baseline (main, 1b37617, plus the experiment switches). The first variant is the full phone frame at 3x: 402x874 at 3x, touch emulation, 3 runs, median. Milliseconds. Display limit removed. Desktop GPU.
+# frame: mean animation-frame interval (CPU and GPU together). gpu: timer query over the frame. cpu: main thread in the frame callback.
+
+## winter, opening
+dpr=3                              frame  6.28         gpu 19.72         cpu  6.17  calls  46  tris 507024  1206x2622
+dpr=3&msaa=0                       frame  4.18  -2.10  gpu 12.66  -7.06  cpu  4.07  calls  46  tris 507024  1206x2622
+dpr=3&off=transition               frame  5.11  -1.17  gpu 17.28  -2.44  cpu  5.00  calls  45  tris 507023  1206x2622
+dpr=3&off=bloom                    frame  5.46  -0.82  gpu 10.08  -9.64  cpu  5.35  calls  30  tris 507008  1206x2622
+dpr=3&bloom=0.5                    frame  5.90  -0.37  gpu 18.64  -1.08  cpu  5.79  calls  46  tris 507024  1206x2622
+dpr=1.75                           frame  2.86  -3.42  gpu  4.98 -14.74  cpu  2.75  calls  46  tris 507024  703x1529
+dpr=1.5                            frame  2.32  -3.96  gpu  5.04 -14.69  cpu  2.22  calls  46  tris 507024  603x1311
+dpr=1.25                           frame  2.09  -4.19  gpu  3.91 -15.81  cpu  2.00  calls  46  tris 507024  502x1092
+dpr=1                              frame  1.76  -4.52  gpu  3.72 -16.00  cpu  1.67  calls  46  tris 507024  402x874
+
+## spring, engineering rest
+dpr=3                              frame  4.56         gpu 14.39         cpu  4.44  calls  70  tris 373882  1206x2622
+dpr=3&msaa=0                       frame  3.00  -1.57  gpu  5.18  -9.21  cpu  2.88  calls  70  tris 373882  1206x2622
+dpr=3&off=transition               frame  3.55  -1.01  gpu 10.51  -3.87  cpu  3.44  calls  69  tris 373881  1206x2622
+dpr=3&off=bloom                    frame  3.82  -0.74  gpu  6.35  -8.03  cpu  3.69  calls  54  tris 373866  1206x2622
+dpr=3&bloom=0.5                    frame  4.22  -0.34  gpu 13.04  -1.34  cpu  4.11  calls  70  tris 373882  1206x2622
+dpr=1.75                           frame  2.22  -2.35  gpu  4.54  -9.85  cpu  2.10  calls  70  tris 373882  703x1529
+dpr=1.5                            frame  1.87  -2.70  gpu  3.05 -11.33  cpu  1.76  calls  70  tris 373882  603x1311
+dpr=1.25                           frame  1.74  -2.83  gpu  2.45 -11.94  cpu  1.64  calls  70  tris 373882  502x1092
+dpr=1                              frame  1.74  -2.83  gpu  2.32 -12.06  cpu  1.63  calls  70  tris 373882  402x874
+
+## return, arriving
+dpr=3                              frame  6.63         gpu 20.43         cpu  6.48  calls  47  tris 507024  1206x2622
+dpr=3&msaa=0                       frame  4.49  -2.13  gpu 14.15  -6.28  cpu  4.36  calls  47  tris 507024  1206x2622
+dpr=3&off=transition               frame  5.49  -1.14  gpu 18.44  -1.99  cpu  5.39  calls  46  tris 507023  1206x2622
+dpr=3&off=bloom                    frame  5.84  -0.79  gpu 10.12 -10.31  cpu  5.66  calls  31  tris 507008  1206x2622
+dpr=3&bloom=0.5                    frame  6.28  -0.35  gpu 19.37  -1.06  cpu  6.15  calls  47  tris 507024  1206x2622
+dpr=1.75                           frame  3.00  -3.63  gpu  5.58 -14.85  cpu  2.89  calls  47  tris 507024  703x1529
+dpr=1.5                            frame  2.40  -4.23  gpu  4.84 -15.58  cpu  2.29  calls  47  tris 507024  603x1311
+dpr=1.25                           frame  2.09  -4.53  gpu  3.62 -16.81  cpu  2.00  calls  47  tris 507024  502x1092
+dpr=1                              frame  2.07  -4.56  gpu  3.32 -17.11  cpu  1.97  calls  47  tris 507024  402x874
