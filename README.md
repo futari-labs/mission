@@ -2,7 +2,7 @@
 
 The Futari Labs website. An immersive 3D site built with React, TypeScript, three.js, and GSAP.
 
-The site is one looping scroll journey: the 二人 landmark, Futari Engineering, Kensaku, a particle installation with links, and a return to the landmark. Scrolling down never reaches an end. `docs/journey.md` describes the sequence and how the transitions work. `docs/identity/README.md` describes the 二人 identity, `docs/construction/README.md` the construction sequences and the ring passage, and `docs/environment/README.md` the landscape the journey happens in.
+The site is one looping scroll journey: the 二人 landmark, Futari Engineering, Kensaku, a particle installation with links, and a return to the landmark. Scrolling down never reaches an end. `docs/journey.md` describes the sequence and how the transitions work. `docs/identity/README.md` describes the 二人 identity, `docs/construction/README.md` the construction sequences and the ring passage, `docs/environment/README.md` the landscape the journey happens in, and `docs/seasons/README.md` how that landscape moves through four seasons in one lap.
 
 ## Run it
 
@@ -49,7 +49,8 @@ The command takes about 18 seconds and rewrites every file in `public/assets/`. 
 | Frost, displacement, color fringe, white-out | `src/scene/transition.ts` |
 | Stone, frost, and snow shading | `src/scene/materials.ts` |
 | Sky colour and fog falloff | `src/scene/sky.ts` |
-| Distant ridges, cloud sea, cloud banks, travelling snow | `src/scene/environment.ts`, with sizes and tones in `src/scene/look.ts` |
+| Distant ridges, cloud sea, hills, trees, and what is in the air | `src/scene/environment.ts` |
+| What each season looks like | `seasons` in `src/scene/look.ts` |
 | Entrance sequence | `enter()` in `src/scene/Engine.ts` |
 | Type scale, spacing, layout | `src/styles/site.css` |
 

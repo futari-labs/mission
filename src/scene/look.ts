@@ -41,7 +41,26 @@ export const look = {
 		],
 		cloudTop: -20,
 		cloudOpacity: 0.94,
+		/** Hills that rise out of the cloud near the line of travel: x, z, radius, and height of the top. */
+		islands: [
+			[58, -150, 34, 1.5],
+			[-70, -170, 34, 1],
+			[-62, -205, 32, 2.5],
+			[34, -262, 30, 0.5],
+			[40, -320, 30, 2],
+			[-100, -390, 40, 2],
+		],
 	},
+	/**
+	 * One entry per season, in the order of the lap: the lab, Engineering, Kensaku, Explore.
+	 * Everything seasonal is interpolated between neighbours, and autumn wraps to winter.
+	 */
+	seasons: [
+		{ sky: '#a3a8b6', haze: 1, key: '#fff7ee', keyPower: 2.5, hemiSky: '#e6ecf6', hemiGround: '#6f7684', snowLine: -60, growth: 0, canopy: 0, blossom: 0, leafA: '#5f7a55', leafB: '#6d8a5c', ground: '#5a606c', flake: '#f2f6ff', flakes: 1, leaf: 0, cloud: 1 },
+		{ sky: '#b0bbbf', haze: 1.08, key: '#fff1dc', keyPower: 2.6, hemiSky: '#eef1ee', hemiGround: '#7c8873', snowLine: 112, growth: 0.8, canopy: 0.85, blossom: 1, leafA: '#7b9769', leafB: '#96ad82', ground: '#7c8870', flake: '#f7dbe3', flakes: 0.3, leaf: 0.55, cloud: 1.03 },
+		{ sky: '#9bb1cd', haze: 0.6, key: '#fffcf4', keyPower: 3.1, hemiSky: '#e4eefb', hemiGround: '#6c8068', snowLine: 172, growth: 1, canopy: 1.25, blossom: 0, leafA: '#507258', leafB: '#6a8b66', ground: '#6c8065', flake: '#ffffff', flakes: 0.03, leaf: 0.55, cloud: 1.16 },
+		{ sky: '#b9aa9c', haze: 0.92, key: '#ffd5a8', keyPower: 2.5, hemiSky: '#f1e7da', hemiGround: '#857565', snowLine: 190, growth: 0.62, canopy: 0.66, blossom: 0, leafA: '#b97f47', leafB: '#9d553b', ground: '#84755e', flake: '#d2893a', flakes: 0.34, leaf: 1, cloud: 0.98 },
+	],
 } as const;
 
 export type Vec3Tuple = readonly [number, number, number];

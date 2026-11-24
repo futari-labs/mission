@@ -51,6 +51,8 @@ export class Engine {
 	private readonly atmosphere: Atmosphere;
 	private readonly beam: Beam;
 	private readonly environment: Environment;
+	private keyLight!: THREE.DirectionalLight;
+	private hemisphere!: THREE.HemisphereLight;
 	private readonly transition: TransitionEffect;
 	private exhibits: ExhibitSet | null = null;
 	private explore: Explore | null = null;
@@ -150,7 +152,8 @@ export class Engine {
 		this.scene.environmentIntensity = look.lights.environment;
 		pmrem.dispose();
 		const { hemisphere, key, rim } = look.lights;
-		this.scene.add(new THREE.HemisphereLight(hemisphere.sky, hemisphere.ground, hemisphere.intensity));
+		this.hemisphere = new THREE.HemisphereLight(hemisphere.sky, hemisphere.ground, hemisphere.intensity);
+		this.scene.add(this.hemisphere);
 		const keyLight = new THREE.DirectionalLight(key.color, key.intensity);
 		keyLight.position.set(...key.position);
 		keyLight.target.position.set(0, 2.5, 0);
@@ -162,6 +165,7 @@ export class Engine {
 		keyLight.shadow.normalBias = 0.035;
 		const rimLight = new THREE.DirectionalLight(rim.color, rim.intensity);
 		rimLight.position.set(...rim.position);
+		this.keyLight = keyLight;
 		this.scene.add(keyLight, keyLight.target, rimLight);
 	}
 
@@ -254,6 +258,7 @@ export class Engine {
 		this.lab.visible = false;
 		for (const group of groups) group.visible = true;
 		this.beam.update(1, 0);
+		this.environment.warm(true);
 		for (const station of [STATION.engineering, STATION.kensaku, STATION.explore, new THREE.Vector3(0, STATION.kensaku.y, RING_Z[1])]) {
 			eye.position.set(station.x + 2, station.y + 1, station.z + 12);
 			eye.lookAt(station);
@@ -263,6 +268,7 @@ export class Engine {
 		}
 		this.renderer.setRenderTarget(null);
 		target.dispose();
+		this.environment.warm(false);
 		for (const group of groups) group.visible = false;
 		this.lab.visible = labWas;
 	}
@@ -416,7 +422,6 @@ export class Engine {
 
 		// 4. apply the state: only groups near the camera render
 		const s = this.state;
-		this.fog.density = s.fogDensity + (look.fog.introDensity - s.fogDensity) * this.intro.fog;
 		this.lab.visible = s.lab;
 		this.landmark.gate = s.gate;
 		if (s.lab) {
@@ -426,8 +431,16 @@ export class Engine {
 			this.atmosphere.update(time);
 		} else this.landmark.dark();
 		this.beam.update(s.beam * this.landmark.lightLevel, time);
-		// the travelling snow yields to the opening's own snow while that is on screen
-		this.environment.update(time, s.worldShift, s.worldVeil, s.lab ? 1 - 0.75 * this.intro.snow * s.snow : 1);
+		// The season sets the sky, the light, and the haze together. What is in the air yields to the
+		// opening's own snow while that is on screen.
+		const season = this.environment.update(time, s.season, s.worldShift, s.worldVeil, s.lab ? 1 - 0.75 * this.intro.snow * s.snow : 1);
+		this.keyLight.color.copy(season.key);
+		this.keyLight.intensity = season.keyPower;
+		this.hemisphere.color.copy(season.hemiSky);
+		this.hemisphere.groundColor.copy(season.hemiGround);
+		// haze thins or thickens the air between the exhibits. The opening and the return keep their own fog.
+		const density = s.fogDensity * (s.lab || s.shift !== 0 ? 1 : season.haze);
+		this.fog.density = density + (look.fog.introDensity - density) * this.intro.fog;
 		const pointer = follow ? this.pointer : null;
 		if (this.exhibits) {
 			this.exhibits.engineering.visible = s.engineering;

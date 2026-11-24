@@ -67,6 +67,8 @@ export interface JourneyState {
 	/** Where the distant environment is drawn along z, and how hidden in the sky it is. See the return. */
 	worldShift: number;
 	worldVeil: number;
+	/** Where the year is: 0 winter, 1 spring, 2 summer, 3 autumn, rising to 4, which is winter again. */
+	season: number;
 }
 
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -203,6 +205,8 @@ export function stateAt(u: number, cameraZ: number, reducedMotion: boolean, out:
 	out.rings[0] = out.rings[1] = out.rings[2] = 1;
 	out.worldShift = 0;
 	out.worldVeil = 0;
+	// Each chapter rests in one season, and each move between chapters carries the year forward.
+	out.season = u < T.engineering[0] ? step(u, 0.16, 0.34) : u < T.kensaku[0] ? 1 + step(u, T.engineering[1], T.kensaku[0]) : 2 + step(u, T.kensaku[1], T.explore);
 
 	if (u > RETURN_FROM) {
 		// The return is set from the position alone. Nothing here may depend on where the camera is,
@@ -214,6 +218,8 @@ export function stateAt(u: number, cameraZ: number, reducedMotion: boolean, out:
 		// own place while hidden, and come out again with the opening landscape.
 		out.worldShift = t < 0.42 ? RETURN_SHIFT : 0;
 		out.worldVeil = step(t, 0.03, 0.27) * (1 - step(t, 0.56, 0.9));
+		// autumn turns to winter under the snow, and is winter before the opening landscape is clear
+		out.season = 3 + step(t, 0.05, 0.78);
 		out.gate = 0;
 		out.beam = 0;
 		out.white = 0;
@@ -275,6 +281,6 @@ export const emptyState = (): JourneyState => ({
 	lab: true, engineering: false, kensaku: false, explore: false,
 	gather: 0, stream: 0, stage: false, disperse: 0, recede: 0, snow: 1, shift: 0,
 	engineeringBuild: 1, engineeringShell: 1, kensakuBuild: 1, kensakuShell: 1, passage: false, ringVeil: 1, rings: [1, 1, 1],
-	worldShift: 0, worldVeil: 0,
+	worldShift: 0, worldVeil: 0, season: 0,
 });
 export const emptyPose = (): Pose => ({ position: new THREE.Vector3(), target: new THREE.Vector3(), fov: 27 });

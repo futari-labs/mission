@@ -1,0 +1,6 @@
+entrance                   {"frames":490,"mean":6.9,"p50":6.9,"p95":7.5,"p99":8.4,"max":12.3,"over33ms":0,"calls":46,"triangles":507038}
+rest, 3 s                  {"frames":433,"mean":6.9,"p50":6.9,"p95":7.4,"p99":8.4,"max":8.7,"over33ms":0,"calls":46,"triangles":507038}
+lap 1, downward            {"frames":2893,"mean":6.9,"p50":6.9,"p95":8.4,"p99":8.9,"max":18.6,"over33ms":0,"calls":56,"triangles":649910}
+lap 2, downward            {"frames":2839,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.9,"max":10.8,"over33ms":0,"calls":56,"triangles":649910}
+one lap upward             {"frames":2832,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.8,"max":12.2,"over33ms":0,"calls":46,"triangles":507038}
+resources                  {"programs":[44,44],"geometries":[77,77],"textures":[26,26],"requests":11,"heapMB":28,"rebases":3}
