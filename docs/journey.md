@@ -133,15 +133,27 @@ lab group drawn, opening copy shown.
 
 One renderer and one scene. The lab, each exhibit, and the installation are groups that render only while
 the camera is near them, so at most two are drawn at once. The transition effect is one post-processing
-pass with four uniforms.
+pass with four uniforms. Frost, the white-out, and the dialog's dim rest at zero for most of the lap, and
+the pass is left out of every frame in which they do.
 
-Three rules came out of measurement and should be kept.
+How many pixels are rendered, and how the scene buffer is sampled, is a quality tier. A phone and a desktop
+start on different tiers, and a governor moves between them from measured frames.
+`docs/mobile-performance/README.md` describes the tiers, the governor, and how to measure on a phone.
+
+Four rules came out of measurement and should be kept.
 
 - The number of lights in the scene never changes. Lights sit outside the groups that get hidden and go
   to zero intensity instead. Hiding a light changes the light count, and every lit shader then recompiles
   the first time a chapter appears.
-- The later chapters are drawn once into a small offscreen target when they load, so their shaders and
-  buffers are ready before the visitor scrolls to them.
+- Everything is compiled and uploaded before it is needed, and for the buffer it will be drawn into. Materials
+  are compiled against a small half-float target, the same kind the frames use: compiled against the canvas
+  they come out as different programs and the real ones compile again in the first frame. The opening is drawn
+  into that target once before the entrance starts its clock. The later chapters are drawn into it one group
+  per frame when they load, so no single frame carries all of their uploads. A visit that starts in a later
+  chapter draws it at once.
+- The canvas is as tall as the viewport gets with the browser's toolbar away (`100lvh`), so a phone's toolbar
+  sliding in or out never resizes it. A resize that does change the canvas is applied once, at the start of
+  the next frame, and never moves the journey: the damped travel carries on from where it was.
 - Chapter copy fades by scroll progress, set as an inline opacity on a permanent layer. The chapter links
   switch with no transition. CSS transitions on either dropped a frame at every chapter boundary.
 
@@ -157,6 +169,11 @@ Start `pnpm preview`, then:
 | `node tools/journey-test.mjs` | Chapters, links, details dialog, keyboard, touch, reduced motion, fallbacks. Exits non-zero on failure. |
 | `node tools/nav-test.mjs` | Chapter links, on a desktop frame and a phone-sized touch frame: all six routes with duration, pace, direction, and exact arrival; that what lies between is played; wheel, touch, and key taking over without a jump; replacement; resize and rotation on the way; the lap boundary; reduced motion. Prints the measured durations. Exits non-zero on failure. |
 | `node tools/motion-test.mjs` | Camera continuity for the entrance handoff, reversals, fast scroll, navigation, reload, resize. |
+| `node tools/governor-test.ts` | The quality governor against scripted frames: sustained and moderate slowdowns, startup stalls, a browser frame-rate cap, raising and locking out a tier. No browser. |
+| `node tools/governor-live.mjs` | The governor in a real page on a phone-sized frame: a tier change keeps the journey continuous, and a rotation rebuilds the buffers without moving it. |
+| `node tools/overlay-test.mjs` | The `?debug=performance` overlay: absent and not loaded on a normal visit, refresh rate, capture, reset, copy, download. |
+| `node tools/startup.mjs` | Stalls while the page loads and on first arrival at each chapter, over several loads with an empty cache. |
+| `node tools/ablate.mjs --variants="dpr=1.75;dpr=1.25"` | Controlled rendering experiments: frame cost with one setting changed at a time, the scene held still at each station. |
 | `node tools/perf.mjs` | Frame intervals, draw calls, and triangles for the opening, two laps downward, and one lap upward, plus resource counts. Headed by default. |
 | `node tools/scene-cost.mjs` | Draw calls, triangles, and frame intervals with the scene held still at each chapter and transition. `--dpr=2` and `--phone` set the frame. `--uncapped` stops waiting for the display, to compare the cost of two builds. |
 | `node tools/forms-sheet.mjs out.jpg` | The three particle forms at Explore, one frame each. |
