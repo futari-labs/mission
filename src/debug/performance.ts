@@ -131,7 +131,7 @@ export interface Report {
 	gpu: { method: string; samples: number; mean: number; p50: number; p95: number; max: number; pollResolutionMs?: number; discarded: number; caveat?: string };
 	slowFrames: { budgetMs: number; overBudgetX1_5: number; over33ms: number; over50ms: number; over100ms: number; byScene: Record<string, number>; recent: [number, number, string, number, number][]; recentColumns: string };
 	quality: { start: Quality | null; end: Quality | null; transitionPass: boolean; tierCeiling: number; tierCount: number; timeline: [number, string][] };
-	governor: { budgetMs: number; cadenceMs: number; capped: boolean; slowShare: number; state: string };
+	governor: { budgetMs: number; cadenceMs: number; capped: boolean; slowShare: number; state: string; lastFrameCostMs: number; frameCostNote: string };
 	draw: { calls: [number, number]; triangles: [number, number]; note: string };
 	resources: { start: Resources | null; end: Resources | null; rebases: number };
 	position: { units: number; travel: number; scene: string; chapter: string | null; engineState: string };
@@ -550,7 +550,7 @@ export const createDiagnostics: CreateDiagnostics = (source: DiagnosticsSource):
 			gpu: { method: gpuMethod, ...gpuStats(), ...(fences && pollGaps ? { pollResolutionMs: r2(pollGapSum / pollGaps) } : {}), discarded: gpuDiscarded, ...(gpuMethod === GPU_NONE ? {} : { caveat: GPU_CAVEAT[gpuMethod] }) },
 			slowFrames: { budgetMs: r2(budgetMs), overBudgetX1_5: slow.budget, over33ms: slow.over33, over50ms: slow.over50, over100ms: slow.over100, byScene: Object.fromEntries(slowByScene), recent: slowList(), recentColumns: 'seconds into capture, position in journey units, scene, frame interval ms, CPU frame work ms' },
 			quality: { start: qualityStart, end: qualityOf(s), transitionPass: s.transitionPass, tierCeiling: s.tierCeiling, tierCount: s.tierCount, timeline: [...timeline] },
-			governor: { budgetMs: r2(s.budgetMs), cadenceMs: r2(s.cadenceMs), capped: s.capped, slowShare: r3(s.slowShare), state: s.governor },
+			governor: { budgetMs: r2(s.budgetMs), cadenceMs: r2(s.cadenceMs), capped: s.capped, slowShare: r3(s.slowShare), state: s.governor, lastFrameCostMs: r2(s.frameCostMs), frameCostNote: 'One whole frame, CPU and GPU together: script start until one pixel could be read back. Measured by the governor a few times a visit, when a change of tier depends on it. 0 means not measured yet.' },
 			draw: { calls: draw.calls[1] ? draw.calls : [0, 0], triangles: draw.triangles[1] ? draw.triangles : [0, 0], note: 'min and max of the last drawn frame, sampled twice a second' },
 			resources: { start: resourcesStart, end: resourcesOf(s), rebases: s.rebases },
 			position: { units: r3(s.units), travel: r3(s.travel), scene: s.scene, chapter: s.chapter, engineState: s.engineState },
@@ -603,6 +603,7 @@ export const createDiagnostics: CreateDiagnostics = (source: DiagnosticsSource):
 			`  geometries ${s.geometries} · textures ${s.textures} · rebases ${s.rebases}`,
 			`<b>governor</b> ${esc(s.governor)} · slow share ${(s.slowShare * 100).toFixed(0)}%`,
 			`  budget ${s.budgetMs.toFixed(1)} ms · display cadence ${s.cadenceMs.toFixed(1)} ms${s.capped ? '\n  <b>the browser is capping frames</b>: Low Power Mode?' : ''}`,
+			`  whole frame, CPU+GPU, read back: ${s.frameCostMs > 0 ? `${s.frameCostMs.toFixed(1)} ms (last sample)` : 'not measured yet'}`,
 			nav.active
 				? `<b>navigation</b> to ${nav.chapter ?? '?'} · ${(nav.elapsedMs / 1000).toFixed(1)} of ${(nav.durationMs / 1000).toFixed(1)} s\n  travel ${nav.from.toFixed(3)} to ${nav.to.toFixed(3)}`
 				: `<b>navigation</b> idle${nav.lastOutcome ? ` · last: ${nav.lastOutcome} after ${(nav.lastDurationMs / 1000).toFixed(1)} s` : ''}${journeys.length ? ` · ${journeys.length} logged` : ''}`,

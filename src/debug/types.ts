@@ -44,6 +44,11 @@ export interface DiagnosticsSnapshot {
 	capped: boolean;
 	/** Share of recent frames that missed the budget, 0 to 1: the governor's rolling estimate. */
 	slowShare: number;
+	/**
+	 * The governor's last measurement of one whole frame, script and GPU together: the time from the start of
+	 * the frame's script until one pixel could be read back. 0 before any measurement. Taken a few times a visit.
+	 */
+	frameCostMs: number;
 	/** What the governor is doing, in a few words: "steady", "cooldown", "trying tier 3", "held by ?dpr". */
 	governor: string;
 	coarsePointer: boolean;
@@ -54,6 +59,8 @@ export interface DiagnosticsSnapshot {
 export interface DiagnosticsSource {
 	gl: WebGL2RenderingContext | WebGLRenderingContext;
 	snapshot(): DiagnosticsSnapshot;
+	/** The rendered position within the lap, in journey units. Cheap enough to read every frame. */
+	units(): number;
 }
 
 /** What the frame loop calls. Every method must be cheap: no layout, no logging, no allocation per frame. */
