@@ -281,6 +281,25 @@ export function stateAt(u: number, cameraZ: number, reducedMotion: boolean, out:
 	return out;
 }
 
+/** A name for the stretch of the lap at a position, for reports: where a slow frame happened, in words. */
+export function sceneAt(u: number): string {
+	const stretches: [number, string][] = [
+		[0.06, 'winter: opening'],
+		[0.2, 'winter: through the landmark'],
+		[T.engineering[0], 'spring: engineering builds'],
+		[T.engineering[1], 'spring: engineering'],
+		[0.515, 'spring to summer: frost pass'],
+		[T.kensaku[0], 'summer: kensaku builds'],
+		[0.634, 'summer: kensaku focuses'],
+		[T.kensaku[1], 'summer: kensaku'],
+		[T.explore, 'summer to autumn: ring passage'],
+		[RETURN_FROM, 'autumn: explore'],
+		[RETURN_FROM + 0.42 * (CYCLE - RETURN_FROM), 'return: dispersing'],
+		[CYCLE, 'return: arriving in winter'],
+	];
+	return stretches.find(([to]) => u < to)?.[1] ?? 'winter: opening';
+}
+
 export const emptyState = (): JourneyState => ({
 	gate: 0, beam: 0, fogDensity: look.fog.density, white: 0, frost: 0, front: 0,
 	lab: true, engineering: false, kensaku: false, explore: false,

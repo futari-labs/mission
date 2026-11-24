@@ -4,14 +4,15 @@ import gsap from 'gsap';
 import { BlendFunction, BloomEffect, EffectComposer, EffectPass, NoiseEffect, RenderPass, ToneMappingEffect, ToneMappingMode, VignetteEffect } from 'postprocessing';
 import * as THREE from 'three';
 import { CHAPTERS, type ChapterId, CYCLE, chapterAt, chapterOpacity, nearestChapter, unitsOf } from '../journey/chapters.ts';
-import { maintain, readTravel, rebaseCount } from '../journey/travel.ts';
+import type { DiagnosticsSnapshot, PerformanceDiagnostics } from '../debug/types.ts';
+import { maintain, navigationState, readTravel, rebaseCount } from '../journey/travel.ts';
 import { Atmosphere } from './atmosphere.ts';
 import { Beam } from './beam.ts';
 import { Environment } from './environment.ts';
 import { type ExhibitSet, loadExhibits } from './exhibits.ts';
 import { applyLayerExperiment, experiment, tag } from './experiment.ts';
 import { Explore } from './explore.ts';
-import { emptyPose, emptyState, poseAt, RING_Z, restUnits, STATION, stateAt } from './journey.ts';
+import { emptyPose, emptyState, poseAt, RING_Z, restUnits, STATION, sceneAt, stateAt } from './journey.ts';
 import { Landmark } from './landmark.ts';
 import { look } from './look.ts';
 import { loadDetailTexture, stoneUniforms } from './materials.ts';
@@ -89,6 +90,9 @@ export class Engine {
 	private slowFrames = 0;
 	private pixelRatio: number;
 	private probe: ((interval: number) => void) | null = null;
+	/** With ?debug=performance: the overlay. Null on a normal visit, which then collects nothing. */
+	private diagnostics: PerformanceDiagnostics | null = null;
+	private engineState: EngineState = 'loading';
 	/** With ?probe: milliseconds of script time spent in each frame callback. */
 	private readonly scriptTimes: number[] = [];
 	private readonly cleanup: (() => void)[] = [];
@@ -120,7 +124,13 @@ export class Engine {
 		this.buildLights();
 		this.bind();
 		this.resize();
-		if (new URLSearchParams(location.search).has('probe')) {
+		const params = new URLSearchParams(location.search);
+		if (params.get('debug') === 'performance') {
+			void import('../debug/performance.ts').then(({ createDiagnostics }) => {
+				if (!this.disposed) this.diagnostics = createDiagnostics({ gl: this.renderer.getContext(), snapshot: () => this.snapshot() });
+			});
+		}
+		if (params.has('probe')) {
 			const frames: number[] = [];
 			const info = this.renderer.info;
 			const camera: number[] = [];
@@ -133,6 +143,52 @@ export class Engine {
 				shift.push(this.state.shift);
 			};
 		}
+	}
+
+	private report(state: EngineState): void {
+		this.engineState = state;
+		this.diagnostics?.mark('state', state);
+		this.options.onState(state);
+	}
+
+	/** Everything the performance overlay shows that is not a per-frame sample. */
+	private snapshot(): DiagnosticsSnapshot {
+		const info = this.renderer.info;
+		const buffer = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+		return {
+			units: this.units,
+			travel: this.travel,
+			chapter: this.chapter ?? null,
+			scene: sceneAt(this.units),
+			engineState: this.engineState,
+			tier: 0,
+			tierName: 'fixed',
+			tierCeiling: 0,
+			tierCount: 1,
+			dpr: this.pixelRatio,
+			devicePixelRatio,
+			msaa: this.composer.multisampling,
+			bloomScale: experiment.bloom ?? 1,
+			transitionPass: true,
+			cssWidth: this.canvas.clientWidth,
+			cssHeight: this.canvas.clientHeight,
+			bufferWidth: buffer.x,
+			bufferHeight: buffer.y,
+			calls: info.render.calls,
+			triangles: info.render.triangles,
+			programs: info.programs?.length ?? 0,
+			geometries: info.memory.geometries,
+			textures: info.memory.textures,
+			rebases: rebaseCount(),
+			budgetMs: 1000 / 60,
+			cadenceMs: 1000 / 60,
+			capped: false,
+			slowShare: 0,
+			governor: experiment.governor ? 'steady' : 'held by the URL',
+			coarsePointer: this.coarse,
+			reducedMotion: this.options.reducedMotion,
+			navigation: navigationState(),
+		};
 	}
 
 	private buildPipeline(): void {
@@ -222,7 +278,7 @@ export class Engine {
 	}
 
 	async load(): Promise<void> {
-		this.options.onState('loading');
+		this.report('loading');
 		// The later chapters load alongside the opening, so a visitor who reloads mid-journey does not wait for the landmark first.
 		const later = this.loadLater();
 		try {
@@ -238,7 +294,7 @@ export class Engine {
 			this.start();
 		} catch (error) {
 			console.error('Opening scene failed to load', error);
-			this.options.onState('failed');
+			this.report('failed');
 		}
 		await later;
 	}
@@ -294,7 +350,7 @@ export class Engine {
 
 	private enter(): void {
 		const d = look.entrance.duration;
-		const tl = gsap.timeline({ onComplete: () => this.options.onState('ready') });
+		const tl = gsap.timeline({ onComplete: () => this.report('ready') });
 		this.timeline = tl;
 		tl.to(this.intro, { fog: 0, duration: d * 0.86, ease: 'power2.out' }, 0);
 		tl.to(this.intro, { camera: 1, duration: d * 0.95, ease: 'power3.inOut' }, 0);
@@ -311,7 +367,7 @@ export class Engine {
 		// the light between the characters comes on when the last stones settle: a short flare, then the resting level
 		tl.to(this.landmark, { lightLevel: 1.9, duration: 0.22, ease: 'power2.out' }, last - 0.15);
 		tl.to(this.landmark, { lightLevel: 1, duration: 0.9, ease: 'power2.inOut' }, last + 0.07);
-		tl.call(() => this.options.onState('entering'), [], 0);
+		tl.call(() => this.report('entering'), [], 0);
 		// arriving mid-page, for a capture, or with reduced motion: no entrance to watch
 		if (this.options.still || this.options.reducedMotion || this.units > 0.02) tl.progress(1);
 	}
@@ -350,10 +406,12 @@ export class Engine {
 			this.timer.update();
 			const raw = this.timer.getDelta();
 			this.probe?.(raw * 1000);
+			this.diagnostics?.frameStart(raw * 1000);
 			this.govern(raw);
 			const began = this.probe ? performance.now() : 0;
 			this.render(Math.min(raw, 0.05));
 			if (this.probe) this.scriptTimes.push(performance.now() - began);
+			this.diagnostics?.frameEnd();
 		};
 		this.frame = requestAnimationFrame(loop);
 	}
@@ -487,12 +545,15 @@ export class Engine {
 		}
 		this.transition.set(s.frost, s.front, s.white, this.dim.value, time);
 		this.renderer.info.reset();
+		this.diagnostics?.renderStart();
 		this.composer.render(dt);
+		this.diagnostics?.renderEnd();
 	}
 
 	dispose(): void {
 		this.disposed = true;
 		this.stop();
+		this.diagnostics?.dispose();
 		this.timeline?.kill();
 		gsap.killTweensOf(this.dim);
 		for (const fn of this.cleanup) fn();
