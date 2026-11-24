@@ -21,6 +21,29 @@ const LAYERS = 5;
 
 type Uniforms = Record<string, THREE.IUniform>;
 
+/**
+ * How deep along the corridor one batch of plants reaches, in metres. Measured along the lap, 40 m
+ * leaves out nearly as many triangles as culling plant by plant, for about a third of the draw calls.
+ */
+const BATCH_DEPTH = 40;
+
+/**
+ * How far a leaf card reaches beyond the point its four corners share: the card's half-diagonal at
+ * the plant's size, and the sway of the air. The vertex shader moves the corners out, so the mesh's
+ * own bounds, taken from those shared points, are too small by this much.
+ */
+const cardMargin = (reach: number, scale: number) => Math.SQRT2 * reach * scale + 0.05 * scale;
+
+/** A geometry that draws the same vertex buffers as another, with room for attributes of its own. */
+function shareGeometry(source: THREE.BufferGeometry): THREE.BufferGeometry {
+	const geometry = new THREE.BufferGeometry();
+	for (const [name, attribute] of Object.entries(source.attributes)) geometry.setAttribute(name, attribute);
+	geometry.setIndex(source.index);
+	geometry.boundingSphere = source.boundingSphere?.clone() ?? null;
+	geometry.boundingBox = source.boundingBox?.clone() ?? null;
+	return geometry;
+}
+
 /** The alpha below which a pixel of a leaf card is dropped: in a multisampled frame, and in one with a single sample per pixel. */
 const CUT = { coverage: 0.04, single: 0.5 } as const;
 
@@ -372,8 +395,6 @@ export class Grove {
 		const ground = material(BANK_VERTEX, BANK_FRAGMENT);
 		for (const mesh of meshes.filter((m) => m.name.startsWith('bank_'))) {
 			bake(mesh).material = ground;
-			// never culled, so every bank reaches the GPU in the warm-up frame and none arrives mid-journey
-			mesh.frustumCulled = false;
 			mesh.renderOrder = -5;
 			this.root.add(tag(mesh, 'banks'));
 		}
@@ -383,29 +404,56 @@ export class Grove {
 		const place = new THREE.Matrix4();
 		const turn = new THREE.Quaternion();
 		const up = new THREE.Vector3(0, 1, 0);
+		// Each kind of plant is drawn in batches, one per stretch of the corridor and side of it, so the
+		// camera's frustum can leave out the groves it has passed and the ones beside a narrow frame.
+		const cell = (p: number[]) => `${p[2] < 0 ? 'w' : 'e'}${Math.floor(p[4] / BATCH_DEPTH)}`;
 		extras.species.forEach((species, s) => {
 			const { wood, cards } = this.plantMaterials(look.environment.bark[s]);
 			for (const detail of [0, 1]) {
-				const here = plants.filter((p) => p[0] === s && (this.coarse ? 1 : p[1]) === detail);
-				if (here.length === 0) continue;
-				const data = new Float32Array(here.length * 4);
+				const batches = new Map<string, number[][]>();
+				for (const p of plants) {
+					if (p[0] !== s || (this.coarse ? 1 : p[1]) !== detail) continue;
+					const key = cell(p);
+					batches.set(key, [...(batches.get(key) ?? []), p]);
+				}
 				for (const [part, mat] of [['wood', wood], ['cards', cards]] as const) {
+					if (batches.size === 0) continue;
 					const source = bake(meshes.find((m) => m.name === `${species}_${detail}_${part}`)!);
-					const mesh = new THREE.InstancedMesh(source.geometry, mat, here.length);
-					here.forEach((p, i) => {
-						// the mesh is stored quantized, and its own transform restores its size
-						place.compose(new THREE.Vector3(p[2], p[3], p[4]), turn.setFromAxisAngle(up, p[5]), new THREE.Vector3(p[6], p[6], p[6])).multiply(source.matrixWorld);
-						mesh.setMatrixAt(i, place);
-						data.set([p[7], p[8], p[9], p[6]], i * 4);
-					});
-					mesh.geometry.setAttribute('aPlant', new THREE.InstancedBufferAttribute(data, 4));
-					if (part === 'cards') keepAlpha(mesh);
-					mesh.frustumCulled = false;
-					mesh.renderOrder = -5;
-					this.root.add(tag(mesh, part === 'cards' ? 'foliage' : 'wood'));
+					source.geometry.computeBoundingSphere();
+					for (const here of batches.values()) {
+						// the batches of one mesh share its vertex buffers, and differ only in which plants they place
+						const geometry = shareGeometry(source.geometry);
+						const mesh = new THREE.InstancedMesh(geometry, mat, here.length);
+						const data = new Float32Array(here.length * 4);
+						let largest = 0;
+						here.forEach((p, i) => {
+							// the mesh is stored quantized, and its own transform restores its size
+							place.compose(new THREE.Vector3(p[2], p[3], p[4]), turn.setFromAxisAngle(up, p[5]), new THREE.Vector3(p[6], p[6], p[6])).multiply(source.matrixWorld);
+							mesh.setMatrixAt(i, place);
+							data.set([p[7], p[8], p[9], p[6]], i * 4);
+							largest = Math.max(largest, p[6]);
+						});
+						geometry.setAttribute('aPlant', new THREE.InstancedBufferAttribute(data, 4));
+						mesh.computeBoundingSphere();
+						if (part === 'cards') {
+							keepAlpha(mesh);
+							mesh.boundingSphere!.radius += cardMargin(extras.cardReach, largest);
+						}
+						mesh.renderOrder = -5;
+						this.root.add(tag(mesh, part === 'cards' ? 'foliage' : 'wood'));
+					}
 				}
 			}
 		});
+	}
+
+	/**
+	 * While warming, nothing here is culled, so every bank and every batch of plants reaches the GPU
+	 * in the one offscreen frame and none of them uploads when it first comes into view mid-journey.
+	 */
+	warm(on: boolean): void {
+		this.root.visible = on;
+		for (const child of this.root.children) child.frustumCulled = !on;
 	}
 
 	private material = (vertexShader: string, fragmentShader: string, more: Uniforms = {}) =>
@@ -450,8 +498,11 @@ export class Grove {
 			mesh.setMatrixAt(0, source.matrixWorld);
 			// leafs on time, a middling tint, flowers fully, and is its own size
 			mesh.geometry.setAttribute('aPlant', new THREE.InstancedBufferAttribute(new Float32Array([0.5, 0.45, 1, 1]), 4));
-			mesh.frustumCulled = false;
-			if (source === cardMesh) keepAlpha(mesh);
+			mesh.computeBoundingSphere();
+			if (source === cardMesh) {
+				keepAlpha(mesh);
+				mesh.boundingSphere!.radius += cardMargin(Number(this.defines.CARD_REACH), 1);
+			}
 			group.add(mesh);
 		}
 		return group;

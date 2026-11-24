@@ -57,7 +57,6 @@ export class Passage {
 			const joint = { value: 0 };
 			const veil = { value: 1 };
 			const mesh = new THREE.InstancedMesh(segment.geometry, createStoneMaterial('landmark', { uJoint: joint, uVeil: veil }), count);
-			mesh.frustumCulled = false;
 			const frame = new THREE.Matrix4().compose(
 				new THREE.Vector3(0, BEAM_Y, RING_Z[i]),
 				new THREE.Quaternion().setFromEuler(new THREE.Euler(layout.pitch, layout.yaw, layout.roll)),
@@ -101,6 +100,9 @@ export class Passage {
 				ring.mesh.setMatrixAt(k, this.m);
 			});
 			ring.mesh.instanceMatrix.needsUpdate = true;
+			// The segments move, so the ring's bounds are taken again from where they are now. With true
+			// bounds a ring stops being drawn a few metres after the camera has gone through it.
+			ring.mesh.computeBoundingSphere();
 			const closed = THREE.MathUtils.smoothstep(p, 0.86, 1);
 			ring.joint.value = look.passage.joint * closed;
 			ring.veil.value = veil;

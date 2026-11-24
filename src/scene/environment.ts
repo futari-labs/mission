@@ -474,7 +474,7 @@ export class Environment {
 
 	/** Draws the banks and groves for one offscreen frame, so they are compiled before spring needs them. */
 	warm(on: boolean): void {
-		this.grove.root.visible = on;
+		this.grove.warm(on);
 	}
 
 	dispose(): void {

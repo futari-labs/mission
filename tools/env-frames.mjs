@@ -55,6 +55,8 @@ await page.goto(`${base}/?still&probe${query ? `&${query}` : ''}`);
 await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
 await page.waitForTimeout(2500);
 await page.addStyleTag({ content: '.brand,.chapters,.panel,.loader,.mast{visibility:hidden}' });
+// what is on the GPU before any travel: if the warm-up did its work, a lap adds nothing to it
+const start = await page.evaluate(() => window.__futariProbe.stats());
 const cycle = await page.evaluate(() => window.__futari.map.cycle);
 let at = flag('at') ? flag('at').split(',').map(Number) : Array.from({ length: steps }, (_, i) => +((i / steps) * cycle).toFixed(4));
 if (args.includes('--reverse')) at = [...at].reverse();
@@ -66,6 +68,6 @@ for (const u of at) {
 	console.log(u.toFixed(4), JSON.stringify({ calls: s.calls, triangles: s.triangles }));
 }
 const end = await page.evaluate(() => ({ ...window.__futariProbe.stats(), assets: performance.getEntriesByType('resource').filter((r) => r.name.includes('/assets/')).map((r) => `${r.name.split('/').pop()} ${Math.round(r.transferSize / 1024)} kB`) }));
-console.log('resources', JSON.stringify({ programs: end.programs, geometries: end.geometries, textures: end.textures, assets: end.assets }));
+console.log('resources', JSON.stringify({ programs: [start.programs, end.programs], geometries: [start.geometries, end.geometries], textures: [start.textures, end.textures], assets: end.assets }));
 console.log(errors.length ? `errors: ${errors.slice(0, 4).join(' | ')}` : 'no errors');
 await browser.close();
