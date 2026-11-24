@@ -31,12 +31,56 @@ When the visitor is no longer in the middle lap, `maintain` moves `scrollY` by w
 `base` by the same number, reading the scroll position back so the result is exact to the sub-pixel.
 Travel does not change, so nothing on screen moves. It waits for scrolling to pause for 180 ms, because
 moving the scroll position can cut a touch fling short. It acts mid-scroll only within 0.8 lap of an end
-of the spacer, which takes three laps of unbroken scrolling to reach. It never runs while a dialog is open.
-
-Navigation scrolls to the nearest occurrence of a chapter's rest point, forward or back. From Explore,
-Lab is nearer forward, so that link plays the return.
+of the spacer, which takes three laps of unbroken scrolling to reach. It never runs while a dialog is open,
+under a finger that is resting on the screen, or during a chapter link's journey.
 
 A reload restores the position within the lap. A resize or rotation keeps the same logical position.
+A `resize` event that leaves the spacer the same height, which is what a phone toolbar sliding away
+sends, does not touch the scroll position: setting it there would cut a touch fling short.
+
+### Chapter links are journeys
+
+A chapter link travels to the nearest occurrence of that chapter's rest point, forward or back, across
+the lap boundary if that is closer. From Explore, Lab is nearer forward, so that link plays the return.
+
+The link does not use the browser's smooth scroll, which covers any distance in well under a second.
+`travel.ts` scrolls the page itself, one frame at a time, on an animation-frame loop that runs only while
+a journey does. It moves the same scroll position a wheel or a finger moves, so construction, copy,
+seasons, and transitions play exactly as they do by hand, and the renderer needs to know nothing about it.
+
+The pace is one setting, `NAVIGATION_SCREENS_PER_SECOND` in `src/journey/chapters.ts`: viewport heights
+of scrolling per second, 0.9. A steady manual scroll in the test tools is one viewport a second and the
+unhurried scroll of the recordings is half that, so 0.9 is a normal scrolling pace, and it is the same
+on every screen. A journey eases up to that pace in `NAVIGATION_EASE_IN_SECONDS` (1 s), holds it, and
+eases down to rest in `NAVIGATION_EASE_OUT_SECONDS` (1.2 s). Its duration is therefore its distance
+divided by the pace, plus 1.1 s. A hop too short to reach the pace peaks lower.
+
+| Route | Direction | Scrolling | Duration |
+| --- | --- | --- | --- |
+| Lab to Work, Work to Lab | forward, back | 3.7 screens | 5.1 s |
+| Work to Explore, Explore to Work | forward, back | 5.0 screens | 6.7 s |
+| Explore to Lab, Lab to Explore | forward through the return, back through it | 2.2 screens | 3.5 s |
+
+A journey is kept in travel units, not pixels. Each frame it asks how fast it should be going this far
+from its destination, moves its speed gently toward that, and sets the scroll position to match. So:
+
+- A resize or rotation on the way changes the lap length under it and nothing else.
+- It starts from the middle lap of the spacer and is never longer than half a lap, so `maintain` leaves
+  it alone for exactly as long as it runs. There is no timeout.
+- Another link replaces it and inherits its speed. A destination further on is carried on to without a
+  stop. One behind turns the pace round.
+- A wheel, a finger on the scene, a scroll key, or any scroll it did not make (a scrollbar drag) ends it
+  at once. It simply stops driving: the page is where it was that frame, and the renderer's damping eases
+  the camera out. A phone reports the scroll position back a moment after it is set, so the journey
+  recognises its own last few positions and does not take that echo for the visitor's hand. A finger that lands on a link or a button takes over only once it moves, so a tap on
+  another chapter replaces the journey instead of stopping it.
+- Opening the details dialog ends it.
+- A frame that arrives late advances it by at most a tenth of a second of travel, so it never leaps.
+- It ends exactly on the rest point, the same place a jump lands.
+
+While a journey runs, `readTravel` returns the journey's own position, which the scroll position follows
+to the nearest pixel, so pixel rounding never reaches the camera. With reduced motion, and for keyboard
+focus that lands in another chapter, a link is an immediate jump as before.
 
 Without WebGL the spacer is hidden and the page is a plain finite document.
 
@@ -111,6 +155,7 @@ Start `pnpm preview`, then:
 | --- | --- |
 | `node tools/loop-test.mjs` | The loop: two laps downward, upward across the join, stops and reversals at the join, fast scroll across it, navigation, dialog, reload, and resize after crossing, stable resources, and touch flings. Exits non-zero on failure. |
 | `node tools/journey-test.mjs` | Chapters, links, details dialog, keyboard, touch, reduced motion, fallbacks. Exits non-zero on failure. |
+| `node tools/nav-test.mjs` | Chapter links, on a desktop frame and a phone-sized touch frame: all six routes with duration, pace, direction, and exact arrival; that what lies between is played; wheel, touch, and key taking over without a jump; replacement; resize and rotation on the way; the lap boundary; reduced motion. Prints the measured durations. Exits non-zero on failure. |
 | `node tools/motion-test.mjs` | Camera continuity for the entrance handoff, reversals, fast scroll, navigation, reload, resize. |
 | `node tools/perf.mjs` | Frame intervals, draw calls, and triangles for the opening, two laps downward, and one lap upward, plus resource counts. Headed by default. |
 | `node tools/scene-cost.mjs` | Draw calls, triangles, and frame intervals with the scene held still at each chapter and transition. `--dpr=2` and `--phone` set the frame. `--uncapped` stops waiting for the display, to compare the cost of two builds. |

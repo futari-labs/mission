@@ -21,6 +21,17 @@ export const RETURN_FROM = 1.1;
 /** Viewport heights of scrolling per journey unit. One lap is CYCLE times this. */
 export const SCREENS_PER_UNIT = 8.5;
 
+/**
+ * The pace of a chapter link: how many viewport heights of scrolling it covers per second once it
+ * is under way. This is the one setting to tune. A journey takes its distance divided by this,
+ * plus about a second for easing in and out, so a longer journey takes longer and none is a sweep.
+ * A steady manual scroll is about one viewport a second and an unhurried one about half.
+ */
+export const NAVIGATION_SCREENS_PER_SECOND = 0.9;
+/** Seconds a journey takes to reach that pace from rest, and to come to rest from it. */
+export const NAVIGATION_EASE_IN_SECONDS = 1;
+export const NAVIGATION_EASE_OUT_SECONDS = 1.2;
+
 export const CHAPTERS: ChapterRange[] = [
 	{ id: 'lab', showFrom: -0.022, showTo: 0.105, rest: 0 },
 	{ id: 'engineering', showFrom: 0.388, showTo: 0.495, rest: 0.43 },
