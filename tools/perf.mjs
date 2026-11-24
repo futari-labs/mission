@@ -44,21 +44,26 @@ for (let i = 0; i < 4; i++) {
 }
 await take('pointer sweeps');
 
-const max = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
-if (max > 50) {
+const lap = await page.evaluate(() => window.__futari.unitPixels() * 1.16);
+if (lap > 50) {
 	await page.mouse.move(viewport.width / 2, viewport.height / 2);
 	const scroll = async (dir, label) => {
 		await page.evaluate(() => window.__futariProbe.frames.splice(0));
 		// about one viewport per second, in small wheel steps, like a steady trackpad scroll
 		const step = (viewport.height / 60) * dir;
-		for (let y = 0; y < max; y += Math.abs(step)) {
+		for (let y = 0; y < lap; y += Math.abs(step)) {
 			await page.mouse.wheel(0, step);
 			await page.waitForTimeout(16);
 		}
 		await page.waitForTimeout(600);
-		await take(label);
+		const s = await take(label);
+		return s;
 	};
-	await scroll(1, 'journey forward');
-	await scroll(-1, 'journey reverse');
+	const before = await page.evaluate(() => window.__futariProbe.stats());
+	await scroll(1, 'lap 1, downward');
+	await scroll(1, 'lap 2, downward');
+	await scroll(-1, 'one lap upward');
+	const after = await page.evaluate(() => ({ ...window.__futariProbe.stats(), requests: performance.getEntriesByType('resource').length, heapMB: Math.round((performance.memory?.usedJSHeapSize ?? 0) / 1e6) }));
+	console.log('resources'.padEnd(26), JSON.stringify({ programs: [before.programs, after.programs], geometries: [before.geometries, after.geometries], textures: [before.textures, after.textures], requests: after.requests, heapMB: after.heapMB, rebases: after.rebases }));
 }
 await browser.close();

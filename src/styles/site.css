@@ -178,6 +178,10 @@ a {
 	position: relative;
 }
 
+.track {
+	pointer-events: none;
+}
+
 .panel {
 	position: fixed;
 	z-index: 2;
@@ -644,8 +648,12 @@ a {
 /* ---------- without WebGL: the same content as a plain page over images of the real scene ---------- */
 
 :is([data-webgl='unavailable'], [data-webgl='lost']) .chapter {
-	height: auto !important;
 	background: var(--fog) center / cover no-repeat;
+}
+
+/* a plain finite page: no loop */
+[data-webgl='unavailable'] .track {
+	display: none;
 }
 
 :is([data-webgl='unavailable'], [data-webgl='lost']) .panel {

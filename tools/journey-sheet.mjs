@@ -1,4 +1,4 @@
-// Samples the journey at fixed progress values into one contact sheet. Each frame is the
+// Samples the journey at fixed positions (journey units, one lap is 1.16) into one contact sheet. Each frame is the
 // resolved state for that scroll position, so it shows composition, not motion.
 // Usage: node tools/journey-sheet.mjs <out-file> [base-url] [--phone] [p1,p2,...]
 import { chromium } from 'playwright-core';
@@ -6,7 +6,7 @@ import { chromium } from 'playwright-core';
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const [out = 'journey-sheet.jpg', base = 'http://localhost:4173'] = args;
 const phone = process.argv.includes('--phone');
-const list = args[2]?.split(',').map(Number) ?? [0, 0.09, 0.12, 0.15, 0.17, 0.185, 0.2, 0.215, 0.24, 0.28, 0.365, 0.45, 0.475, 0.5, 0.59, 0.68, 0.72, 0.76, 0.8, 1];
+const list = args[2]?.split(',').map(Number) ?? [0, 0.12, 0.17, 0.2, 0.24, 0.365, 0.47, 0.59, 0.7, 0.76, 0.9, 0.99, 1.02, 1.05, 1.08, 1.1, 1.12, 1.14, 1.155, 1.16];
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
 const page = await browser.newPage({ viewport });
@@ -18,9 +18,9 @@ await page.waitForFunction(() => window.__futari?.state === 'ready', null, { tim
 await page.waitForTimeout(2500);
 const frames = [];
 for (const p of list) {
-	await page.evaluate((v) => scrollTo(0, v * (document.documentElement.scrollHeight - innerHeight)), p);
+	await page.evaluate((u) => window.__futari.jump(u), p);
 	await page.waitForTimeout(350);
-	frames.push({ label: `p ${p}`, data: (await page.screenshot({ type: 'jpeg', quality: 78 })).toString('base64') });
+	frames.push({ label: `u ${p}`, data: (await page.screenshot({ type: 'jpeg', quality: 78 })).toString('base64') });
 }
 const opt = (k, d) => Number(process.argv.find((a) => a.startsWith(`--${k}=`))?.split('=')[1] ?? d);
 const cols = opt('cols', phone ? 10 : 5);

@@ -9,28 +9,29 @@ const [out = 'motion-sheet.jpg', base = 'http://localhost:4173'] = args;
 const opt = (k, d) => Number(process.argv.find((a) => a.startsWith(`--${k}=`))?.split('=')[1] ?? d);
 const phone = process.argv.includes('--phone');
 const reverse = process.argv.includes('--reverse');
-const from = opt('from', 0.04), to = opt('to', 0.84), every = opt('every', 0.0225);
+const from = opt("from", 0), to = opt("to", 1.2), every = opt("every", 0.034);
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
 const page = await browser.newPage({ viewport });
 await page.goto(`${base}/?probe`);
 await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });
 await page.waitForTimeout(2500);
-const max = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+// positions are journey units and may run past one lap (1.16) to show the loop
+const unit = await page.evaluate(() => window.__futari.unitPixels());
 const [a, b] = reverse ? [to, from] : [from, to];
-await page.evaluate((y) => scrollTo(0, y), a * max);
+await page.evaluate((u) => window.__futari.jump(u), a);
 await page.waitForTimeout(1500);
 await page.mouse.move(viewport.width / 2, viewport.height / 2);
 const frames = [];
 let next = a;
 const dir = Math.sign(b - a);
 const step = (viewport.height * 0.8) / 60;
-for (let y = a * max; dir > 0 ? y <= b * max : y >= b * max; y += step * dir) {
+for (let y = a * unit; dir > 0 ? y <= b * unit : y >= b * unit; y += step * dir) {
 	await page.mouse.wheel(0, step * dir);
 	await page.waitForTimeout(16);
-	const p = await page.evaluate(() => window.__futariProbe.stats().progress);
-	if (dir > 0 ? p >= next : p <= next) {
-		frames.push({ label: `p ${p.toFixed(3)}`, data: (await page.screenshot({ type: 'jpeg', quality: 76 })).toString('base64') });
+	const u = await page.evaluate(() => window.__futariProbe.stats().travel * 1.16);
+	if (dir > 0 ? u >= next : u <= next) {
+		frames.push({ label: `u ${u.toFixed(3)}`, data: (await page.screenshot({ type: 'jpeg', quality: 76 })).toString('base64') });
 		next += every * dir;
 	}
 }

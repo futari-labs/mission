@@ -8,14 +8,15 @@ const browser = await chromium.launch({ channel: 'chrome', headless: process.arg
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e).slice(0, 160)));
-const reset = () => page.evaluate(() => { window.__futariProbe.frames.length = 0; window.__futariProbe.camera.length = 0; });
-const state = () => page.evaluate(() => ({ ...window.__futari, progress: +window.__futariProbe.stats().progress.toFixed(4), goal: +(scrollY / (document.documentElement.scrollHeight - innerHeight)).toFixed(4) }));
+const reset = () => page.evaluate(() => { window.__futariProbe.frames.length = 0; window.__futariProbe.camera.length = 0; window.__futariProbe.shift.length = 0; });
+const state = () => page.evaluate(() => ({ state: window.__futari.state, chapter: window.__futari.chapter, position: +(window.__futariProbe.stats().travel * 1.16).toFixed(4), goal: +window.__futari.units().toFixed(4) }));
 // largest camera movement between two consecutive frames, in metres, and the frame interval at that moment
 const jumps = () => page.evaluate(() => {
-	const c = window.__futariProbe.camera, f = window.__futariProbe.frames;
+	const c = window.__futariProbe.camera, f = window.__futariProbe.frames, sh = window.__futariProbe.shift;
 	let worst = { step: 0, at: 0, interval: 0 }, travelled = 0;
 	for (let i = 4; i < c.length; i += 4) {
-		const step = Math.hypot(c[i] - c[i - 4], c[i + 1] - c[i - 3], c[i + 2] - c[i - 2]);
+		const moved = sh[i / 4] - sh[i / 4 - 1];
+		const step = Math.min(Math.hypot(c[i] - c[i - 4], c[i + 1] - c[i - 3], c[i + 2] - c[i - 2]), Math.hypot(c[i] - c[i - 4], c[i + 1] - c[i - 3], c[i + 2] - c[i - 2] - moved));
 		travelled += step;
 		if (step > worst.step) worst = { step: +step.toFixed(3), at: +c[i + 3].toFixed(3), interval: +f[i / 4].toFixed(1) };
 	}
@@ -26,7 +27,8 @@ const wheel = async (total, perSecond) => {
 	for (let y = 0; Math.abs(y) < Math.abs(total); y += step) { await page.mouse.wheel(0, step); await page.waitForTimeout(16); }
 };
 const report = async (label, extra = {}) => console.log(label.padEnd(34), JSON.stringify({ ...(await jumps()), ...(await state()), ...extra }));
-const max = () => page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+// pixels of scrolling per journey unit. One lap is 1.16 units.
+const max = () => page.evaluate(() => window.__futari.unitPixels());
 
 await page.goto(`${base}/?probe`);
 await page.mouse.move(720, 450);
@@ -54,7 +56,7 @@ await reset(); await page.click('nav.chapters a[href="#lab"]'); await page.waitF
 await report('nav click: lab');
 
 // reload mid-page: the browser restores the scroll position, and the scene must resolve to it
-await page.evaluate((y) => scrollTo(0, y), m * 0.59);
+await page.evaluate(() => window.__futari.jump(0.59));
 await page.waitForTimeout(600);
 await page.reload();
 await page.waitForFunction(() => window.__futari?.state === 'ready', null, { timeout: 30000 });

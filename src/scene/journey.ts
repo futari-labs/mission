@@ -1,7 +1,7 @@
-// The narrative as a pure function of scroll progress: where the camera is, and every value
-// the scene derives from that. Nothing here keeps state.
+// The narrative as a pure function of the position within one lap: where the camera is, and every
+// value the scene derives from that. Nothing here keeps state.
 import * as THREE from 'three';
-import { CHAPTERS, nearestChapter } from '../journey/chapters.ts';
+import { CYCLE, nearestChapter, RETURN_FROM } from '../journey/chapters.ts';
 import { look } from './look.ts';
 
 /** Height of the guiding light. It starts between the two characters of the landmark. */
@@ -12,6 +12,14 @@ export const STATION = {
 	explore: new THREE.Vector3(0, BEAM_Y, -165),
 };
 
+/**
+ * The exhibits and the installation stand in open fog, so where they are in the world is free.
+ * For the return to the opening, the installation is treated as standing this far along z instead:
+ * in front of the opening camera. The camera then flies forward through the dispersing particles
+ * and arrives at the monument. The move happens while nothing else is visible, so it cannot be seen.
+ */
+export const RETURN_SHIFT = 95 - STATION.explore.z;
+
 export interface Pose {
 	position: THREE.Vector3;
 	target: THREE.Vector3;
@@ -21,7 +29,7 @@ export interface Pose {
 export interface JourneyState {
 	/** 0 closed, 1 fully parted: the two characters making room for the camera. */
 	gate: number;
-	/** How far the beam has extended from the seam, 0 to 1. */
+	/** How far the beam has extended from the landmark, 0 to 1. */
 	beam: number;
 	fogDensity: number;
 	white: number;
@@ -37,6 +45,14 @@ export interface JourneyState {
 	stream: number;
 	/** The base and lights of the installation. Hidden until the camera has passed the lens. */
 	stage: boolean;
+	/** Return to the opening: 0 the form holds, 1 its particles have become drifting snow. */
+	disperse: number;
+	/** Return to the opening: 0 the base and its lights are in place, 1 they have sunk away. */
+	recede: number;
+	/** How much of the landscape's own snow and mist shows. Below 1 only during the return. */
+	snow: number;
+	/** How far along z the installation is drawn from its station. See RETURN_SHIFT. */
+	shift: number;
 }
 
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -70,15 +86,20 @@ const PHONE: Framing = {
 	fov: 41,
 };
 
+type Path = [THREE.CatmullRomCurve3, THREE.CatmullRomCurve3];
 interface Paths {
 	framing: Framing;
-	toEngineering: [THREE.CatmullRomCurve3, THREE.CatmullRomCurve3];
-	toKensaku: [THREE.CatmullRomCurve3, THREE.CatmullRomCurve3];
-	toExplore: [THREE.CatmullRomCurve3, THREE.CatmullRomCurve3];
+	toEngineering: Path;
+	toKensaku: Path;
+	toExplore: Path;
+	toLab: Path;
 }
 
 function buildPaths(f: Framing): Paths {
 	const curve = (...pts: THREE.Vector3[]) => new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+	const shifted = (p: THREE.Vector3) => p.clone().setZ(p.z + RETURN_SHIFT);
+	const from = shifted(f.explore[0]);
+	const look0 = shifted(f.explore[1]);
 	return {
 		framing: f,
 		// toward the light, between the two characters, and along the beam, as one move
@@ -96,15 +117,20 @@ function buildPaths(f: Framing): Paths {
 			curve(f.kensaku[0], v(4.3, BEAM_Y + 0.6, K.z - 0.5), v(1.4, BEAM_Y + 3.6, K.z - 27), f.explore[0]),
 			curve(f.kensaku[1], v(0, BEAM_Y, K.z - 22), v(0, BEAM_Y - 0.9, X.z + 2), f.explore[1]),
 		],
+		// the return: forward through the dispersing form, up into the snow, and down to the opening view
+		toLab: [
+			curve(from, v(0, BEAM_Y + 1.7, from.z - 14), v(f.hero[0].x * 0.45, 8.6, f.hero[0].z + 32), v(f.hero[0].x * 0.9, f.hero[0].y + 2.1, f.hero[0].z + 9), f.hero[0]),
+			curve(look0, v(0, BEAM_Y + 0.6, look0.z - 26), v(0.1, 3.8, 24), f.hero[1]),
+		],
 	};
 }
 
 const PATHS = { desktop: buildPaths(DESKTOP), phone: buildPaths(PHONE) };
 const scratch = { a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), d: new THREE.Vector3() };
 
-function along(paths: Paths, progress: number, position: THREE.Vector3, target: THREE.Vector3): void {
+function along(paths: Paths, u: number, position: THREE.Vector3, target: THREE.Vector3): void {
 	const f = paths.framing;
-	const use = (pair: [THREE.CatmullRomCurve3, THREE.CatmullRomCurve3], t: number) => {
+	const use = (pair: Path, t: number) => {
 		pair[0].getPointAt(ease(t), position);
 		pair[1].getPointAt(ease(t), target);
 	};
@@ -112,54 +138,98 @@ function along(paths: Paths, progress: number, position: THREE.Vector3, target: 
 		position.copy(pair[0]);
 		target.copy(pair[1]);
 	};
-	if (progress <= 0.06) rest(f.hero);
-	else if (progress < 0.31) use(paths.toEngineering, span(progress, 0.06, 0.31));
-	else if (progress <= 0.42) rest(f.engineering);
-	else if (progress < 0.53) use(paths.toKensaku, span(progress, 0.42, 0.53));
-	else if (progress <= 0.65) rest(f.kensaku);
-	else if (progress < 0.82) use(paths.toExplore, span(progress, 0.65, 0.82));
-	else rest(f.explore);
+	if (u <= 0.06) rest(f.hero);
+	else if (u < 0.31) use(paths.toEngineering, span(u, 0.06, 0.31));
+	else if (u <= 0.42) rest(f.engineering);
+	else if (u < 0.53) use(paths.toKensaku, span(u, 0.42, 0.53));
+	else if (u <= 0.65) rest(f.kensaku);
+	else if (u < 0.82) use(paths.toExplore, span(u, 0.65, 0.82));
+	else if (u <= RETURN_FROM) rest(f.explore);
+	else use(paths.toLab, span(u, RETURN_FROM, CYCLE));
 }
 
-/** Camera pose for a progress value. `wide` is 0 for a phone portrait frame and 1 for desktop. */
-export function poseAt(progress: number, wide: number, reducedMotion: boolean, out: Pose): Pose {
-	const p = reducedMotion ? restProgress(progress) : progress;
-	along(PATHS.phone, p, scratch.a, scratch.b);
-	along(PATHS.desktop, p, scratch.c, scratch.d);
+/**
+ * Camera pose for a position within the lap.
+ * `wide` is 0 for a phone portrait frame and 1 for desktop. `aspect` is the frame's width over height.
+ */
+export function poseAt(u: number, wide: number, aspect: number, out: Pose): Pose {
+	along(PATHS.phone, u, scratch.a, scratch.b);
+	along(PATHS.desktop, u, scratch.c, scratch.d);
 	out.position.lerpVectors(scratch.a, scratch.c, wide);
 	out.target.lerpVectors(scratch.b, scratch.d, wide);
 	out.fov = THREE.MathUtils.lerp(PHONE.fov, DESKTOP.fov, wide);
+	// Between the phone and desktop framings, the opening view pulls back so both characters stay
+	// in frame. The pull fades in and out with the opening view, at both ends of the lap.
+	const hero = Math.max(1 - step(u, 0.06, 0.14), step(u, CYCLE - 0.07, CYCLE));
+	if (hero > 0) {
+		const fit = Math.max(1, 1.6 / Math.max(aspect, 0.72)) ** (0.55 * wide);
+		out.position.sub(out.target).multiplyScalar(1 + (fit - 1) * hero).add(out.target);
+	}
 	return out;
 }
 
-/** With reduced motion the camera only ever stands at a rest pose. */
-export function restProgress(progress: number): number {
-	const chapter = nearestChapter(progress);
-	return chapter.id === 'lab' ? 0 : chapter.id === 'explore' ? 1 : chapter.rest;
+/** With reduced motion the camera only ever stands at a rest pose, and the scene is that chapter's rest state. */
+export function restUnits(u: number): number {
+	return nearestChapter(u).rest;
 }
 
-export function stateAt(progress: number, cameraZ: number, reducedMotion: boolean, out: JourneyState): JourneyState {
-	// the first transition is keyed to the camera's distance from the seam
-	const passing = THREE.MathUtils.clamp((15 - cameraZ) / 39, 0, 1);
+export function stateAt(u: number, cameraZ: number, reducedMotion: boolean, out: JourneyState): JourneyState {
 	const still = reducedMotion ? 0 : 1;
+	out.disperse = 0;
+	out.recede = 0;
+	out.snow = 1;
+	out.shift = 0;
+
+	if (u > RETURN_FROM) {
+		// The return is set from the position alone. Nothing here may depend on where the camera is,
+		// because the camera is back in the opening landscape while the installation is still in view.
+		const t = span(u, RETURN_FROM, CYCLE);
+		out.shift = RETURN_SHIFT;
+		out.gate = 0;
+		out.beam = 0;
+		out.white = 0;
+		out.frost = 0;
+		out.front = 0;
+		out.engineering = false;
+		out.kensaku = false;
+		out.explore = t < 0.9;
+		out.stage = t < 0.55;
+		out.gather = 1;
+		out.disperse = step(t, 0.03, 0.5);
+		out.recede = step(t, 0, 0.45);
+		// the particles thin out as the landscape's own snow takes over
+		out.stream = 1 - step(t, 0.5, 0.88);
+		out.snow = step(t, 0.36, 0.78);
+		out.lab = t > 0.3;
+		// thick drifting snow in the middle, clearing to the opening's own air
+		const thick = THREE.MathUtils.lerp(look.fog.voidDensity, look.fog.returnDensity, step(t, 0, 0.36));
+		out.fogDensity = THREE.MathUtils.lerp(thick, look.fog.density, ease(span(t, 0.4, 0.97)));
+		return out;
+	}
+
+	// the first transition is keyed to the camera's distance from the landmark
+	const passing = THREE.MathUtils.clamp((15 - cameraZ) / 39, 0, 1);
 	out.gate = 1 - step(cameraZ, 4, 17);
-	out.beam = reducedMotion ? 1 : step(progress, 0.05, 0.2);
+	out.beam = reducedMotion ? (u > 0.2 ? 1 : 0) : step(u, 0.05, 0.2);
 	out.fogDensity = THREE.MathUtils.lerp(look.fog.density, look.fog.voidDensity, 1 - step(cameraZ, -22, 0));
 	out.white = still * 0.92 * (1 - step(cameraZ, -1.5, 3.5)) * step(cameraZ, -17, -5.5);
-	const second = Math.sin(Math.PI * span(progress, 0.435, 0.52)) ** 1.5;
-	const third = Math.sin(Math.PI * span(progress, 0.665, 0.77)) ** 1.5;
+	const second = Math.sin(Math.PI * span(u, 0.435, 0.52)) ** 1.5;
+	const third = Math.sin(Math.PI * span(u, 0.665, 0.77)) ** 1.5;
 	out.frost = still * Math.max(step(passing, 0, 0.3) * (1 - step(passing, 0.62, 1)), 0.5 * second, 0.45 * third);
-	out.front = second > 0 ? 1.35 - 1.7 * span(progress, 0.435, 0.52) : third > 0 ? 1.35 - 1.7 * span(progress, 0.665, 0.77) : passing * 2.6 - 0.15;
+	out.front = second > 0 ? 1.35 - 1.7 * span(u, 0.435, 0.52) : third > 0 ? 1.35 - 1.7 * span(u, 0.665, 0.77) : passing * 2.6 - 0.15;
 	out.lab = cameraZ > -10;
 	out.engineering = cameraZ < 3 && cameraZ > E.z - 22;
 	out.kensaku = cameraZ < E.z + 6 && cameraZ > K.z - 26;
 	out.explore = cameraZ < K.z + 16;
 	out.stage = cameraZ < K.z - 1.5;
-	out.stream = step(progress, 0.635, 0.68);
-	out.gather = reducedMotion ? 1 : step(progress, 0.7, 0.83);
+	out.stream = step(u, 0.635, 0.68);
+	out.gather = reducedMotion ? 1 : step(u, 0.7, 0.83);
 	return out;
 }
 
-export const emptyState = (): JourneyState => ({ gate: 0, beam: 0, fogDensity: look.fog.density, white: 0, frost: 0, front: 0, lab: true, engineering: false, kensaku: false, explore: false, gather: 0, stream: 0, stage: false });
+export const emptyState = (): JourneyState => ({
+	gate: 0, beam: 0, fogDensity: look.fog.density, white: 0, frost: 0, front: 0,
+	lab: true, engineering: false, kensaku: false, explore: false,
+	gather: 0, stream: 0, stage: false, disperse: 0, recede: 0, snow: 1, shift: 0,
+});
 export const emptyPose = (): Pose => ({ position: new THREE.Vector3(), target: new THREE.Vector3(), fov: 27 });
-export { CHAPTERS };

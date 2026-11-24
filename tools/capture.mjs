@@ -13,7 +13,7 @@ const views = [
 	{ name: 'desktop', width: 1440, height: 900, deviceScaleFactor: 1 },
 	{ name: 'phone', width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
 ];
-const rests = { lab: 0, engineering: 0.365, kensaku: 0.59, explore: 1 };
+const rests = { lab: 0, engineering: 0.365, kensaku: 0.59, explore: 0.9 };
 for (const v of views) {
 	const context = await browser.newContext({ viewport: { width: v.width, height: v.height }, deviceScaleFactor: v.deviceScaleFactor, isMobile: v.isMobile, hasTouch: v.hasTouch });
 	const page = await context.newPage();
@@ -25,7 +25,7 @@ for (const v of views) {
 	await page.waitForTimeout(2500);
 	if (bare) await page.addStyleTag({ content: '.brand,.chapters,.panel,.loader{visibility:hidden}' });
 	for (const [chapter, rest] of Object.entries(rests)) {
-		await page.evaluate((p) => scrollTo(0, p * (document.documentElement.scrollHeight - innerHeight)), rest);
+		await page.evaluate((u) => window.__futari.jump(u), rest);
 		await page.waitForFunction((c) => window.__futari?.chapter === c, chapter, { timeout: 10000 }).catch(() => errors.push(`chapter ${chapter} not reached`));
 		await page.waitForTimeout(700);
 		await page.screenshot({ path: path.join(out, `${chapter}-${v.name}.jpg`), type: 'jpeg', quality: 90 });

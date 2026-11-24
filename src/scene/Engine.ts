@@ -3,12 +3,13 @@
 import gsap from 'gsap';
 import { BlendFunction, BloomEffect, EffectComposer, EffectPass, NoiseEffect, RenderPass, ToneMappingEffect, ToneMappingMode, VignetteEffect } from 'postprocessing';
 import * as THREE from 'three';
-import { CHAPTERS, type ChapterId, chapterAt, chapterOpacity, nearestChapter, scrollProgress } from '../journey/chapters.ts';
+import { CHAPTERS, type ChapterId, CYCLE, chapterAt, chapterOpacity, nearestChapter, unitsOf } from '../journey/chapters.ts';
+import { maintain, readTravel, rebaseCount } from '../journey/travel.ts';
 import { Atmosphere } from './atmosphere.ts';
 import { Beam } from './beam.ts';
 import { type ExhibitSet, loadExhibits } from './exhibits.ts';
 import { Explore } from './explore.ts';
-import { emptyPose, emptyState, poseAt, STATION, stateAt } from './journey.ts';
+import { emptyPose, emptyState, poseAt, restUnits, STATION, stateAt } from './journey.ts';
 import { Landmark } from './landmark.ts';
 import { look } from './look.ts';
 import { loadDetailTexture, stoneUniforms } from './materials.ts';
@@ -18,7 +19,7 @@ import { TransitionEffect } from './transition.ts';
 
 declare global {
 	interface Window {
-		__futariProbe?: { frames: number[]; script: number[]; camera: number[]; stats: () => { calls: number; triangles: number; dpr: number; width: number; height: number; progress: number; programs: number } };
+		__futariProbe?: { frames: number[]; script: number[]; camera: number[]; shift: number[]; stats: () => { calls: number; triangles: number; dpr: number; width: number; height: number; progress: number; travel: number; programs: number; geometries: number; textures: number; rebases: number } };
 	}
 }
 
@@ -57,10 +58,14 @@ export class Engine {
 	private pointerActive = false;
 	private readonly coarse = matchMedia('(pointer: coarse)').matches;
 	/** Entrance blend: 0 is the high opening view, 1 hands the camera to scroll progress. */
-	private readonly intro = { camera: 0, fog: 1 };
+	private readonly intro = { camera: 0, fog: 1, snow: 0 };
 	private timeline: gsap.core.Timeline | null = null;
-	/** Damped scroll progress. The single input of the narrative. */
-	private progress = 0;
+	/** Damped continuous travel, in laps. It never wraps. The single input of the narrative. */
+	private travel = 0;
+	/** Travel when the page loaded. Moving away from it hurries the entrance. */
+	private origin = 0;
+	/** Position within the current lap, in journey units. Derived from `travel` every frame. */
+	private units = 0;
 	private chapter: ChapterId | null | undefined;
 	private readonly copy = new Map<ChapterId, number>();
 	private form = 0;
@@ -97,7 +102,8 @@ export class Engine {
 		this.atmosphere = new Atmosphere(this.fog, this.coarse ? 700 : 1500);
 		this.beam = new Beam(this.coarse ? 260 : 520);
 		this.transition = new TransitionEffect(this.fog.color);
-		this.progress = scrollProgress();
+		this.travel = this.origin = readTravel();
+		this.units = unitsOf(this.travel);
 		this.buildPipeline();
 		this.buildLights();
 		this.bind();
@@ -106,10 +112,13 @@ export class Engine {
 			const frames: number[] = [];
 			const info = this.renderer.info;
 			const camera: number[] = [];
-			window.__futariProbe = { frames, script: this.scriptTimes, camera, stats: () => ({ calls: info.render.calls, triangles: info.render.triangles, dpr: this.pixelRatio, width: this.canvas.clientWidth, height: this.canvas.clientHeight, progress: this.progress, programs: info.programs?.length ?? 0 }) };
+			const shift: number[] = [];
+			window.__futariProbe = { frames, script: this.scriptTimes, camera, shift, stats: () => ({ calls: info.render.calls, triangles: info.render.triangles, dpr: this.pixelRatio, width: this.canvas.clientWidth, height: this.canvas.clientHeight, progress: this.units, travel: this.travel, programs: info.programs?.length ?? 0, geometries: info.memory.geometries, textures: info.memory.textures, rebases: rebaseCount() }) };
 			this.probe = (interval) => {
 				frames.push(interval);
-				camera.push(this.camera.position.x, this.camera.position.y, this.camera.position.z, this.progress);
+				camera.push(this.camera.position.x, this.camera.position.y, this.camera.position.z, this.travel * CYCLE);
+				// where the installation is drawn. A step in this is a move of camera and scene together, not camera motion.
+				shift.push(this.state.shift);
 			};
 		}
 	}
@@ -253,10 +262,9 @@ export class Engine {
 		const d = look.entrance.duration;
 		const tl = gsap.timeline({ onComplete: () => this.options.onState('ready') });
 		this.timeline = tl;
-		this.atmosphere.reveal = 0;
 		tl.to(this.intro, { fog: 0, duration: d * 0.86, ease: 'power2.out' }, 0);
 		tl.to(this.intro, { camera: 1, duration: d * 0.95, ease: 'power3.inOut' }, 0);
-		tl.to(this.atmosphere, { reveal: 1, duration: d * 0.5, ease: 'none' }, d * 0.4);
+		tl.to(this.intro, { snow: 1, duration: d * 0.5, ease: 'none' }, d * 0.4);
 		let last = 0;
 		for (const b of this.landmark.blocks) {
 			const at = 0.25 + b.order * 0.115;
@@ -271,7 +279,7 @@ export class Engine {
 		tl.to(this.landmark, { lightLevel: 1, duration: 0.9, ease: 'power2.inOut' }, last + 0.07);
 		tl.call(() => this.options.onState('entering'), [], 0);
 		// arriving mid-page, for a capture, or with reduced motion: no entrance to watch
-		if (this.options.still || this.options.reducedMotion || this.progress > 0.02) tl.progress(1);
+		if (this.options.still || this.options.reducedMotion || this.units > 0.02) tl.progress(1);
 	}
 
 	/** Scrolling during the entrance finishes it fast instead of cutting it, so the camera never snaps. */
@@ -338,27 +346,29 @@ export class Engine {
 		const time = calm ? 0 : this.timer.getElapsed();
 		const wide = THREE.MathUtils.smoothstep(this.camera.aspect, 0.72, 1.45);
 
-		// 1. narrative: scroll progress, damped, is the only input
-		const goal = scrollProgress();
-		if (goal > 0.004) this.hurryEntrance();
-		this.progress = calm || dt === 0 ? goal : this.progress + (goal - this.progress) * (1 - Math.exp(-dt * 5.5));
-		if (Math.abs(goal - this.progress) < 1e-5) this.progress = goal;
-		poseAt(this.progress, wide, reducedMotion, this.pose);
-		// between the phone and desktop framings, pull the opening back so both characters stay in view
-		if (this.progress <= 0.06) {
-			const fit = Math.max(1, 1.6 / Math.max(this.camera.aspect, 0.72)) ** (0.55 * wide);
-			this.pose.position.sub(this.pose.target).multiplyScalar(fit).add(this.pose.target);
-		}
-		stateAt(this.progress, this.pose.position.z, reducedMotion, this.state);
-		// with reduced motion there is no travel between chapters, so one chapter's copy always shows
-		const chapter = reducedMotion ? nearestChapter(this.progress).id : chapterAt(this.progress);
+		// 1. narrative: continuous travel, damped, is the only input. The lap position is taken after damping,
+		// so crossing from one lap into the next is just more travel, never a move back through the sequence.
+		maintain(performance.now());
+		const goal = readTravel();
+		if (Math.abs(goal - this.origin) > 0.004) this.hurryEntrance();
+		// a jump of more than half a lap (the End key, a restored position) goes the short way round
+		if (Math.abs(goal - this.travel) > 0.6) this.travel += Math.round(goal - this.travel);
+		this.travel = calm || dt === 0 ? goal : this.travel + (goal - this.travel) * (1 - Math.exp(-dt * 5.5));
+		if (Math.abs(goal - this.travel) < 1e-6) this.travel = goal;
+		const raw = unitsOf(this.travel);
+		// with reduced motion there is no travel between chapters: the scene stands at a chapter's rest
+		const u = reducedMotion ? restUnits(raw) : raw;
+		this.units = u;
+		poseAt(u, wide, this.camera.aspect, this.pose);
+		stateAt(u, this.pose.position.z, reducedMotion, this.state);
+		const chapter = reducedMotion ? nearestChapter(raw).id : chapterAt(raw);
 		if (chapter !== this.chapter) {
 			this.chapter = chapter;
 			this.options.onChapter(chapter);
 		}
-		// the copy fades with scroll progress, not on a timer, so it reverses exactly and costs no layer changes
+		// the copy fades with position, not on a timer, so it reverses exactly and costs no layer changes
 		for (const c of CHAPTERS) {
-			const opacity = reducedMotion ? (c.id === chapter ? 1 : 0) : Math.round(chapterOpacity(c, this.progress) * 50) / 50;
+			const opacity = reducedMotion ? (c.id === chapter ? 1 : 0) : Math.round(chapterOpacity(c, raw) * 50) / 50;
 			if (this.copy.get(c.id) !== opacity) {
 				this.copy.set(c.id, opacity);
 				this.options.onCopy(c.id, opacity);
@@ -403,6 +413,7 @@ export class Engine {
 		if (s.lab) {
 			// the shadow map redraws only on frames where a block has moved
 			this.renderer.shadowMap.needsUpdate = this.landmark.update(dt, s.gate > 0.01 ? null : ray, time) || !settled;
+			this.atmosphere.reveal = this.intro.snow * s.snow;
 			this.atmosphere.update(time);
 		} else this.landmark.dark();
 		this.beam.update(s.beam * this.landmark.lightLevel, time);

@@ -1,7 +1,8 @@
-import { type CSSProperties, type FocusEvent, type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type FocusEvent, type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { mark } from './content/mark.ts';
 import { site } from './content/site.ts';
-import { CHAPTERS, type ChapterId, chapterAt, JOURNEY_SCREENS, scrollProgress, scrollToChapter } from './journey/chapters.ts';
+import { type ChapterId, CYCLE, chapterAt, unitsOf } from './journey/chapters.ts';
+import { goToChapter, initTravel, lapPixels, placeTravel, readTravel, trackHeight } from './journey/travel.ts';
 import type { Engine, EngineState } from './scene/Engine.ts';
 
 type Phase = EngineState | 'unavailable';
@@ -9,17 +10,20 @@ type ProjectId = (typeof site.projects)[number]['id'];
 
 declare global {
 	interface Window {
-		__futari?: { state: Phase; chapter: ChapterId | null };
+		__futari?: {
+			state: Phase;
+			chapter: ChapterId | null;
+			/** Continuous position in journey units. One lap is CYCLE units. For the capture and test tools. */
+			units: () => number;
+			/** Jumps to a position in journey units. */
+			jump: (units: number) => void;
+			unitPixels: () => number;
+		};
 	}
 }
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-/** The last section also holds the final screen, so the journey ends with the page. */
-const span = (id: ChapterId): CSSProperties => {
-	const c = CHAPTERS.find((x) => x.id === id)!;
-	// svh, not dvh: a phone toolbar that hides while scrolling must not change the length of the journey
-	return { height: `${(c.to - c.from) * JOURNEY_SCREENS * 100 + (id === 'explore' ? 100 : 0)}svh` };
-};
+const here = () => chapterAt(unitsOf(readTravel()));
 
 export function App() {
 	const canvas = useRef<HTMLCanvasElement>(null);
@@ -29,7 +33,8 @@ export function App() {
 	// The active chapter changes while scrolling, so it is written straight to the DOM.
 	// React only reads it when something else causes a render.
 	const root = useRef<HTMLDivElement>(null);
-	const chapterRef = useRef<ChapterId | null>(chapterAt(scrollProgress()));
+	const track = useRef<HTMLDivElement>(null);
+	const chapterRef = useRef<ChapterId | null>('lab');
 	const chapter = chapterRef.current;
 	const setChapter = useCallback((next: ChapterId | null) => {
 		chapterRef.current = next;
@@ -44,58 +49,43 @@ export function App() {
 	const [open, setOpen] = useState<ProjectId | null>(null);
 	const [form, setForm] = useState(0);
 
-	// A reload or a back navigation returns to the same point of the journey. The browser's own
-	// restoration runs before these tall sections exist, so the position is kept here instead.
+	// One module owns the scroll position. It restores it after a reload, keeps it across a resize,
+	// and lets native scrolling run on through lap after lap.
+	const releaseTravel = useRef<(() => void) | null>(null);
 	useLayoutEffect(() => {
-		history.scrollRestoration = 'manual';
-		const key = 'futari.progress';
-		const entry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-		const saved = Number(sessionStorage.getItem(key));
-		if (entry && entry.type !== 'navigate' && saved > 0) {
-			scrollTo(0, saved * (document.documentElement.scrollHeight - innerHeight));
-			setChapter(chapterAt(scrollProgress()));
-		}
-		const save = () => sessionStorage.setItem(key, String(scrollProgress()));
-		addEventListener('pagehide', save);
-		// A resize or a rotation changes the page length. Keep the visitor at the same point of the journey.
-		let last = scrollProgress();
-		let size = [innerWidth, innerHeight];
-		const track = () => void (last = scrollProgress());
-		const resized = () => {
-			const real = innerWidth !== size[0] || Math.abs(innerHeight - size[1]) > 120;
-			size = [innerWidth, innerHeight];
-			if (real) scrollTo(0, last * (document.documentElement.scrollHeight - innerHeight));
-		};
-		addEventListener('scroll', track, { passive: true });
-		addEventListener('resize', resized);
-		return () => {
-			removeEventListener('pagehide', save);
-			removeEventListener('scroll', track);
-			removeEventListener('resize', resized);
-		};
+		if (!track.current) return;
+		releaseTravel.current = initTravel(track.current);
+		setChapter(here());
+		return () => releaseTravel.current?.();
 	}, [setChapter]);
 
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
 		if (params.has('still')) document.documentElement.dataset.still = '';
 		let cancelled = false;
-		const state = { phase: 'loading' as Phase, chapter: chapterAt(scrollProgress()) };
-		const publish = () => void (window.__futari = { state: state.phase, chapter: state.chapter });
+		const state = { phase: 'loading' as Phase, chapter: here() };
+		const publish = () =>
+			void (window.__futari = {
+				state: state.phase,
+				chapter: state.chapter,
+				units: () => readTravel() * CYCLE,
+				jump: (units) => placeTravel(units / CYCLE),
+				unitPixels: () => lapPixels() / CYCLE,
+			});
 		const report = (next: Phase) => {
 			if (cancelled) return;
 			state.phase = next;
 			setPhase(next);
-			document.documentElement.dataset.webgl = next === 'unavailable' || next === 'failed' ? 'unavailable' : 'ok';
+			const flat = next === 'unavailable' || next === 'failed';
+			document.documentElement.dataset.webgl = flat ? 'unavailable' : 'ok';
+			if (flat) {
+				// without the scene the page is a plain finite document: drop the loop and start at the top
+				releaseTravel.current?.();
+				releaseTravel.current = null;
+				scrollTo(0, 0);
+			}
 			publish();
 		};
-		// Without the scene, chapters still follow the scroll position.
-		const fallbackChapter = () => {
-			if (engine.current) return;
-			state.chapter = chapterAt(scrollProgress());
-			setChapter(state.chapter);
-			publish();
-		};
-		addEventListener('scroll', fallbackChapter, { passive: true });
 		// the scene code loads after first paint so the text never waits for it
 		import('./scene/Engine.ts')
 			.then(({ Engine }) => {
@@ -123,7 +113,6 @@ export function App() {
 			});
 		return () => {
 			cancelled = true;
-			removeEventListener('scroll', fallbackChapter);
 			engine.current?.dispose();
 			engine.current = null;
 		};
@@ -131,12 +120,12 @@ export function App() {
 
 	const go = useCallback((id: ChapterId) => (event: MouseEvent) => {
 		event.preventDefault();
-		scrollToChapter(id, !reducedMotion());
+		goToChapter(id, !reducedMotion());
 	}, []);
 
 	// Keyboard focus that lands in another chapter brings that chapter into view.
 	const reveal = useCallback((id: ChapterId) => (event: FocusEvent) => {
-		if (event.target instanceof HTMLElement && event.target.matches(':focus-visible') && chapterAt(scrollProgress()) !== id) scrollToChapter(id, false);
+		if (event.target instanceof HTMLElement && event.target.matches(':focus-visible') && here() !== id) goToChapter(id, false);
 	}, []);
 
 	const show = (id: ProjectId) => setOpen(id);
@@ -186,7 +175,7 @@ export function App() {
 				</nav>
 			</header>
 			<main>
-				<section id="lab" className="chapter" style={span('lab')} aria-labelledby="intro-heading" onFocus={reveal('lab')}>
+				<section id="lab" className="chapter" aria-labelledby="intro-heading" onFocus={reveal('lab')}>
 					<div className="panel" data-chapter="lab" data-active={chapter === 'lab'}>
 						<div className="intro">
 							<p className="label intro-tag" aria-hidden="true">
@@ -203,7 +192,7 @@ export function App() {
 						{site.workHeading}
 					</h2>
 					{site.projects.map((p) => (
-						<article key={p.id} id={p.id} className="chapter" style={span(p.id)} aria-labelledby={`${p.id}-title`} onFocus={reveal(p.id)}>
+						<article key={p.id} id={p.id} className="chapter" aria-labelledby={`${p.id}-title`} onFocus={reveal(p.id)}>
 							<div className={`panel exhibit exhibit-${p.id}`} data-chapter={p.id} data-active={chapter === p.id}>
 								<div className="exhibit-head">
 									<p className="label">{`${site.workHeading} / ${p.number}`}</p>
@@ -227,7 +216,7 @@ export function App() {
 						</article>
 					))}
 				</section>
-				<section id="explore" className="chapter" style={span('explore')} aria-labelledby="explore-heading" onFocus={reveal('explore')}>
+				<section id="explore" className="chapter" aria-labelledby="explore-heading" onFocus={reveal('explore')}>
 					<div className="panel explore" data-chapter="explore" data-active={chapter === 'explore'}>
 						<div className="explore-head">
 							<p className="label">{'////// Links'}</p>
@@ -254,6 +243,8 @@ export function App() {
 					</div>
 				</section>
 			</main>
+			{/* the only tall element: several laps of scroll length for the looping journey */}
+			<div ref={track} className="track" style={{ height: trackHeight }} aria-hidden="true" />
 			<dialog ref={dialog} className="details" aria-labelledby="details-title" onClose={closed}>
 				{project && (
 					<article>

@@ -17,6 +17,10 @@ export class Explore {
 		uMorph: { value: 1 },
 		uGather: { value: 0 },
 		uShow: { value: 0 },
+		uDisperse: { value: 0 },
+		// the volume of air the particles spread into on the return: around the camera's path to the opening
+		uSnowCenter: { value: new THREE.Vector3(-3, 6.5, 62) },
+		uSnowBox: { value: new THREE.Vector3(64, 20, 100) },
 		uSpin: { value: 0 },
 		uCenter: { value: STATION.explore.clone() },
 		uStart: { value: STATION.kensaku.clone().add(new THREE.Vector3(0, 0, 0.6)) },
@@ -71,13 +75,14 @@ export class Explore {
 			uniforms: this.uniforms,
 			fog: false,
 			vertexShader: /* glsl */ `
-				uniform float uTime, uMorph, uGather, uShow, uSpin, uPush, uSize, uFogDensity;
-				uniform vec3 uFrom, uTo, uCenter, uStart, uRayOrigin, uRayDir;
+				uniform float uTime, uMorph, uGather, uShow, uSpin, uPush, uSize, uFogDensity, uDisperse;
+				uniform vec3 uFrom, uTo, uCenter, uStart, uRayOrigin, uRayDir, uSnowCenter, uSnowBox;
 				attribute vec3 aFormA, aFormB, aFormC;
 				attribute float aSeed;
 				varying float vHeat;
 				varying float vFog;
 				varying float vShade;
+				varying float vKeep;
 				vec3 form(vec3 w) { return (aFormA * w.x + aFormB * w.y + aFormC * w.z) * 3.0; }
 				void main() {
 					float m = smoothstep(0.0, 1.0, clamp(uMorph * 1.7 - aSeed * 0.7, 0.0, 1.0));
@@ -100,15 +105,22 @@ export class Explore {
 					float radius = (0.04 + 0.55 * h3 * h3) * (0.35 + along);
 					vec3 riding = mix(uStart, uCenter, along) + vec3(cos(angle), sin(angle), 0.0) * radius;
 					world = mix(riding, world, g);
+					// on the return, each particle leaves the form for its own place in a field of drifting snow
+					float loose = smoothstep(0.0, 1.0, clamp(uDisperse * 1.7 - h3 * 0.7, 0.0, 1.0));
+					vec3 drift = vec3(0.9, -0.32, 0.28) * uTime * (0.4 + h2);
+					vec3 snow = uSnowCenter + mod(vec3(h1, h2, h3) * uSnowBox + drift, uSnowBox) - uSnowBox * 0.5;
+					world = mix(world, snow, loose);
+					vKeep = h1;
 					vec3 rel = world - uRayOrigin;
 					vec3 away = rel - uRayDir * dot(rel, uRayDir);
 					float near = smoothstep(1.25, 0.0, length(away));
 					world += normalize(away + vec3(1e-4)) * near * uPush * 0.85;
-					vHeat = clamp(burst * 0.9 + near * uPush * 0.8 + (1.0 - g) * 0.55, 0.0, 1.0);
+					vHeat = clamp(burst * 0.9 + near * uPush * 0.8 + (1.0 - g) * 0.55 + loose * 0.62, 0.0, 1.0);
 					vec4 mv = viewMatrix * vec4(world, 1.0);
 					float d = -mv.z;
 					gl_Position = projectionMatrix * mv;
-					gl_PointSize = clamp(uSize * (0.7 + 0.6 * fract(aSeed * 17.0)) * projectionMatrix[1][1] * 450.0 / d, 1.2, 9.0) * step(0.001, uShow) * step(1.6, d);
+					float size = mix(uSize * (0.7 + 0.6 * fract(aSeed * 17.0)), 0.03 + 0.045 * h2, loose);
+					gl_PointSize = clamp(size * projectionMatrix[1][1] * 450.0 / d, 1.2, 9.0) * step(1.6, d);
 					vFog = 1.0 - exp(-pow(uFogDensity * d * 0.5, 1.55));
 				}`,
 			fragmentShader: /* glsl */ `
@@ -117,10 +129,12 @@ export class Explore {
 				varying float vHeat;
 				varying float vFog;
 				varying float vShade;
+				varying float vKeep;
 				void main() {
 					vec2 c = gl_PointCoord * 2.0 - 1.0;
 					float r2 = dot(c, c);
-					if (r2 > 1.0 || uShow < 0.01) discard;
+					// showing and hiding thins the cloud particle by particle, so it never pops
+					if (r2 > 1.0 || vKeep >= uShow) discard;
 					vec3 n = vec3(c.x, -c.y, sqrt(1.0 - r2));
 					float lit = 0.3 + 0.8 * max(dot(n, normalize(vec3(-0.45, 0.6, 0.66))), 0.0);
 					vec3 col = mix(uColor * (0.45 + 0.75 * vShade) * lit, uHot * 1.5, vHeat);
@@ -146,7 +160,7 @@ export class Explore {
 		if (!instant) this.tween = gsap.to(this.uniforms.uMorph, { value: 1, duration: 1.9, ease: 'power2.inOut' });
 	}
 
-	update(dt: number, state: { gather: number; stream: number; fogDensity: number; stage: boolean }, ray: THREE.Ray | null, time: number, calm: boolean): void {
+	update(dt: number, state: { gather: number; stream: number; fogDensity: number; stage: boolean; disperse: number; recede: number; shift: number }, ray: THREE.Ray | null, time: number, calm: boolean): void {
 		const u = this.uniforms;
 		u.uTime.value = time;
 		u.uGather.value = state.gather;
@@ -155,13 +169,18 @@ export class Explore {
 		// a slow sway, not a full turn: every form keeps facing the visitor
 		u.uSpin.value = calm ? 0 : Math.sin(time * look.particles.spin) * 0.42;
 		const k = 1 - Math.exp(-dt * 4);
-		u.uPush.value += ((ray && state.gather > 0.95 ? 1 : 0) - u.uPush.value) * k;
+		u.uPush.value += ((ray && state.gather > 0.95 && state.disperse < 0.02 ? 1 : 0) - u.uPush.value) * k;
+		u.uDisperse.value = state.disperse;
+		// on the return the whole installation is drawn in front of the opening camera. See RETURN_SHIFT.
+		u.uCenter.value.z = STATION.explore.z + state.shift;
+		this.stage.position.set(0, -7 * state.recede, state.shift);
+		this.lamp.position.z = STATION.explore.z + state.shift;
 		if (ray) {
 			u.uRayOrigin.value.copy(ray.origin);
 			u.uRayDir.value.copy(ray.direction);
 		}
 		this.stage.visible = state.stage;
-		this.lamp.intensity = state.stage ? 24 * (0.6 + 0.4 * state.gather) : 0;
+		this.lamp.intensity = state.stage ? 24 * (0.6 + 0.4 * state.gather) * (1 - state.recede) : 0;
 	}
 
 	set visible(v: boolean) {

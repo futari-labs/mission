@@ -2,7 +2,7 @@
 
 The Futari Labs website. An immersive 3D site built with React, TypeScript, three.js, and GSAP.
 
-The site is one scroll journey in four chapters: the 二人 landmark, Futari Engineering, Kensaku, and a particle installation with links. `docs/journey.md` describes the sequence and how the transitions work. `docs/identity/README.md` describes the 二人 identity.
+The site is one looping scroll journey: the 二人 landmark, Futari Engineering, Kensaku, a particle installation with links, and a return to the landmark. Scrolling down never reaches an end. `docs/journey.md` describes the sequence and how the transitions work. `docs/identity/README.md` describes the 二人 identity.
 
 ## Run it
 
@@ -42,7 +42,8 @@ The command takes about 18 seconds and rewrites every file in `public/assets/`. 
 | --- | --- |
 | Copy and links | `src/content/site.ts` |
 | Colors, fog, lights, bloom, opening camera, pointer and entrance timing | `src/scene/look.ts` |
-| Chapter ranges and where navigation lands | `src/journey/chapters.ts` |
+| Chapter ranges, lap length, and where navigation lands | `src/journey/chapters.ts` |
+| Scroll position, looping, restore, and resize | `src/journey/travel.ts` |
 | Camera path and everything derived from scroll progress | `src/scene/journey.ts` |
 | Frost, displacement, color fringe, white-out | `src/scene/transition.ts` |
 | Stone, frost, and snow shading | `src/scene/materials.ts` |
@@ -58,6 +59,7 @@ Start `pnpm preview` first.
 node tools/capture.mjs docs/journey                 # rest frame of every chapter, desktop and phone
 node tools/capture.mjs public/fallback --bare       # the same without text, for the no-WebGL fallback
 node tools/journey-test.mjs                         # functional checks
+node tools/loop-test.mjs                            # the infinite loop
 ```
 
 Regenerate `public/fallback/` after any visual change. `docs/journey.md` lists the other tools.

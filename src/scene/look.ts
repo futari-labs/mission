@@ -1,6 +1,6 @@
 // Every tunable of the opening scene in one place: palette, fog, lights, camera keyframes, motion.
 export const look = {
-	fog: { color: '#a3a8b6', density: 0.0088, introDensity: 0.05, voidDensity: 0.026 },
+	fog: { color: '#a3a8b6', density: 0.0088, introDensity: 0.05, voidDensity: 0.026, returnDensity: 0.05 },
 	stone: { dark: '#535966', light: '#858b99', frost: '#ccd3de' },
 	ground: { rockDark: '#4c525f', rockLight: '#7b8291', snow: '#aeb4c2' },
 	lights: {
