@@ -18,8 +18,15 @@ const summarize = (frames) => {
 	return { frames: s.length, mean: +(s.reduce((a, b) => a + b, 0) / s.length).toFixed(1), p50: +at(0.5).toFixed(1), p95: +at(0.95).toFixed(1), p99: +at(0.99).toFixed(1), max: +s[s.length - 1].toFixed(1), over33ms: s.filter((x) => x > 33.4).length };
 };
 const take = async (label) => {
-	const r = await page.evaluate(() => ({ frames: window.__futariProbe.frames.splice(0), stats: window.__futariProbe.stats() }));
-	console.log(label.padEnd(26), JSON.stringify({ ...summarize(r.frames), calls: r.stats.calls, triangles: r.stats.triangles }));
+	const r = await page.evaluate(() => {
+		const probe = window.__futariProbe;
+		const frames = probe.frames.splice(0);
+		// the camera log has one entry of four numbers per frame, the last being the position in the lap
+		const first = probe.camera.length / 4 - frames.length;
+		const slowAt = frames.flatMap((ms, i) => (ms > 33.4 ? [`${probe.camera[(first + i) * 4 + 3].toFixed(3)} (${Math.round(ms)} ms)`] : []));
+		return { frames, slowAt, stats: probe.stats() };
+	});
+	console.log(label.padEnd(26), JSON.stringify({ ...summarize(r.frames), calls: r.stats.calls, triangles: r.stats.triangles, ...(r.slowAt.length ? { slowAt: r.slowAt } : {}) }));
 	return r.stats;
 };
 

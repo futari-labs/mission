@@ -53,6 +53,7 @@ export class Engine {
 	private readonly environment: Environment;
 	private keyLight!: THREE.DirectionalLight;
 	private hemisphere!: THREE.HemisphereLight;
+	private sunDistance = 1;
 	private readonly transition: TransitionEffect;
 	private exhibits: ExhibitSet | null = null;
 	private explore: Explore | null = null;
@@ -166,6 +167,7 @@ export class Engine {
 		const rimLight = new THREE.DirectionalLight(rim.color, rim.intensity);
 		rimLight.position.set(...rim.position);
 		this.keyLight = keyLight;
+		this.sunDistance = keyLight.position.distanceTo(keyLight.target.position);
 		this.scene.add(keyLight, keyLight.target, rimLight);
 	}
 
@@ -228,7 +230,8 @@ export class Engine {
 
 	private async loadLater(): Promise<void> {
 		try {
-			const exhibits = await loadExhibits();
+			// the banks and groves are not in the opening, so they load with the later chapters
+			const [exhibits] = await Promise.all([loadExhibits(), this.environment.load()]);
 			const explore = new Explore(this.fog, exhibits.base);
 			await explore.load(this.coarse ? 9000 : 24000);
 			if (this.disposed) return;
@@ -436,6 +439,9 @@ export class Engine {
 		const season = this.environment.update(time, s.season, s.worldShift, s.worldVeil, s.lab ? 1 - 0.75 * this.intro.snow * s.snow : 1);
 		this.keyLight.color.copy(season.key);
 		this.keyLight.intensity = season.keyPower;
+		// The sun's height changes with the season. It is at winter's whenever the opening is in view,
+		// so the opening's shadow map, drawn for that light, stays true.
+		this.keyLight.position.copy(this.keyLight.target.position).addScaledVector(season.sun, this.sunDistance);
 		this.hemisphere.color.copy(season.hemiSky);
 		this.hemisphere.groundColor.copy(season.hemiGround);
 		// haze thins or thickens the air between the exhibits. The opening and the return keep their own fog.

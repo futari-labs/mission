@@ -1,4 +1,5 @@
 // Writes meshes with baked vertex data to a quantized, meshopt-compressed GLB.
+// Texture coordinates are optional. They must lie in 0 to 1, which is what lets them be quantized.
 import { Document, NodeIO } from '@gltf-transform/core';
 import { EXTMeshoptCompression, KHRMeshQuantization } from '@gltf-transform/extensions';
 import { meshopt } from '@gltf-transform/functions';
@@ -11,6 +12,9 @@ export interface BakedMesh {
 	/** RGBA bytes per vertex. The meaning of each channel is documented where the mesh is baked. */
 	bake: Uint8Array;
 	indices: Uint32Array;
+	/** Texture coordinates, two per vertex, and a second pair for whatever else a mesh needs per vertex. */
+	uvs?: Float32Array;
+	uvs1?: Float32Array;
 	extras?: Record<string, unknown>;
 }
 
@@ -25,6 +29,8 @@ export async function writeGlb(path: string, meshes: BakedMesh[], sceneExtras: R
 			.setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(m.normals).setBuffer(buffer))
 			.setAttribute('COLOR_0', doc.createAccessor().setType('VEC4').setArray(m.bake).setNormalized(true).setBuffer(buffer))
 			.setIndices(doc.createAccessor().setType('SCALAR').setArray(m.indices).setBuffer(buffer));
+		if (m.uvs) prim.setAttribute('TEXCOORD_0', doc.createAccessor().setType('VEC2').setArray(m.uvs).setBuffer(buffer));
+		if (m.uvs1) prim.setAttribute('TEXCOORD_1', doc.createAccessor().setType('VEC2').setArray(m.uvs1).setBuffer(buffer));
 		const node = doc.createNode(m.name).setMesh(doc.createMesh(m.name).addPrimitive(prim));
 		if (m.extras) node.setExtras(m.extras);
 		scene.addChild(node);

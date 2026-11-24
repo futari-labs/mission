@@ -2,12 +2,15 @@
 // Run with: pnpm assets:build
 import { mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { assembled, RING, SHAPES, type Shape } from './exhibits.ts';
+import { foliageAtlas } from './foliage.ts';
 import { type BakedMesh, writeGlb } from './glb.ts';
 import { BLOCKS, type Block, LIGHT, outline, sdBlock, sdBlockCoarse, sdLandmarkCoarse } from './landmark.ts';
+import { buildLandscape } from './landscape.ts';
 import { clamp, makeNoise, mulberry32, smooth } from './noise.ts';
 import { encodeGrayPng } from './png.ts';
 import { type Sdf, surfaceNets, type Vec3 } from './surfacenets.ts';
 import { terrain, terrainHeight, terrainNoise } from './terrain-fn.ts';
+import { CARD_REACH, growTree, SPECIES, UV_TILES } from './trees.ts';
 
 const OUT = 'public/assets';
 mkdirSync(OUT, { recursive: true });
@@ -227,6 +230,34 @@ writeFileSync(`${OUT}/stone-detail.png`, detailTexture(512));
 const shapes = SHAPES.map(bakeShape);
 await writeGlb(`${OUT}/exhibits.glb`, shapes);
 
+// The seasonal banks, and one mesh pair per species and level of detail for what grows on them.
+const land = buildLandscape();
+const flora: BakedMesh[] = [];
+for (const sp of SPECIES)
+	for (const detail of [0, 1] as const) {
+		const tree = growTree(sp, detail);
+		const pack = (name: string, part: typeof tree.wood, uvs1?: number[]): BakedMesh => ({
+			name,
+			positions: new Float32Array(part.positions),
+			normals: new Float32Array(part.normals),
+			bake: new Uint8Array(part.bake),
+			indices: new Uint32Array(part.indices),
+			uvs: new Float32Array(part.uvs),
+			uvs1: uvs1 && new Float32Array(uvs1),
+		});
+		// corners are stored in 0 to 1 so they quantize: 0.5 is the centre of the card
+		flora.push(pack(`${tree.name}_wood`, tree.wood), pack(`${tree.name}_cards`, tree.cards, tree.cards.corners.map((c) => c * 0.5 + 0.5)));
+	}
+const round = (v: number) => Math.round(v * 1000) / 1000;
+await writeGlb(`${OUT}/landscape.glb`, [...land.banks, ...flora], {
+	species: SPECIES.map((sp) => sp.name),
+	uvTiles: UV_TILES,
+	cardReach: CARD_REACH,
+	// species, detail, x, y, z, yaw, scale, early, tint, blossom
+	plants: land.plants.map((p) => [p.species, p.detail, round(p.x), round(p.y), round(p.z), round(p.yaw), round(p.scale), round(p.early), round(p.tint), round(p.blossom)]),
+});
+writeFileSync(`${OUT}/foliage.png`, (await foliageAtlas()).png);
+
 // Particle targets for the final installation: 3 forms of PARTICLES points, 16-bit, in a volume of +-3.
 const PARTICLES = 24000;
 // each form is the whole sculpture in its assembled pose: every part of that group
@@ -254,6 +285,12 @@ const report = {
 	exhibitTriangles: Object.fromEntries(['engineering', 'kensaku', 'shell', 'base', 'ring'].map((g) => [g, shapes.reduce((n, m, i) => n + (SHAPES[i].group === g ? m.indices.length / 3 : 0), 0)])),
 	exhibitsBytes: statSync(`${OUT}/exhibits.glb`).size,
 	particlesBytes: statSync(`${OUT}/particles.bin`).size,
+	bankTriangles: Object.fromEntries(land.banks.map((b) => [b.name, b.indices.length / 3])),
+	floraTriangles: Object.fromEntries(flora.map((m) => [m.name, m.indices.length / 3])),
+	plants: land.plants.length,
+	plantsDetailed: land.plants.filter((p) => p.detail === 0).length,
+	landscapeBytes: statSync(`${OUT}/landscape.glb`).size,
+	foliageBytes: statSync(`${OUT}/foliage.png`).size,
 	seconds: (Date.now() - t0) / 1000,
 };
 console.log(JSON.stringify(report, null, 1));

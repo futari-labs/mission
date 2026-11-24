@@ -75,7 +75,7 @@ between Explore and the lab with no travel.
 5. The mountains and 二人 emerge as the fog clears, and the camera descends into exactly the opening pose.
 
 The exhibits and the installation stand in open fog, so their place in the world is free. When the
-return begins, the installation and the camera are both drawn 260 m further along z, in front of the
+return begins, the installation and the camera are both drawn 285 m further along z, in front of the
 opening camera. Only the installation is visible then, so the move cannot be seen, and from that point
 the camera's flight to the landmark is one real path through one space. The return sets every scene
 value from the position alone. Nothing in it depends on where the camera is, so it cannot switch the
@@ -113,6 +113,8 @@ Start `pnpm preview`, then:
 | `node tools/journey-test.mjs` | Chapters, links, details dialog, keyboard, touch, reduced motion, fallbacks. Exits non-zero on failure. |
 | `node tools/motion-test.mjs` | Camera continuity for the entrance handoff, reversals, fast scroll, navigation, reload, resize. |
 | `node tools/perf.mjs` | Frame intervals, draw calls, and triangles for the opening, two laps downward, and one lap upward, plus resource counts. Headed by default. |
+| `node tools/scene-cost.mjs` | Draw calls, triangles, and frame intervals with the scene held still at each chapter and transition. `--dpr=2` and `--phone` set the frame. `--uncapped` stops waiting for the display, to compare the cost of two builds. |
+| `node tools/shimmer-check.mjs` | A proxy for foliage shimmer: how many pixels change sharply between frames a fraction of a pixel apart. |
 | `node tools/record.mjs docs/journey` | Records more than two laps scrolling downward only. Add `--join` for the upward crossing. |
 | `node tools/motion-sheet.mjs out.jpg` | Frames sampled from a live scroll, as one contact sheet. Positions may run past one lap. |
 

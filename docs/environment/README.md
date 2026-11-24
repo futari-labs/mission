@@ -1,5 +1,7 @@
 # Environment
 
+> This describes the winter landscape as first built. The journey now moves through four seasons (`docs/seasons/README.md`), and the banks and trees of the growing seasons are described in `docs/environment-realism/README.md`. The layers, the sky, and the return described here still apply.
+
 The whole journey now happens in one winter landscape above a sea of clouds. The opening keeps its own grounded terrain. Everything after it is suspended above a cloud-filled valley with distant ridges still in view.
 
 ## Layers, far to near
@@ -23,7 +25,7 @@ The whole journey now happens in one winter landscape above a sea of clouds. The
 
 ## The return and the loop
 
-When the return begins, the camera and the installation are drawn 260 m further along z. The environment moves with them, so no ridge or cloud bank jumps. In the thick snow of the middle of the return every environment layer fades fully into the sky, moves back to its own place while hidden, and comes out again with the opening landscape. At the lap boundary the environment is in the same place on both sides. Its drift runs on the ambient clock, which does not reset.
+When the return begins, the camera and the installation are drawn 285 m further along z. That distance is `RETURN_SHIFT` in `src/scene/journey.ts`: the installation's station at z = -190 is treated as standing at z = 95, in front of the opening camera. The environment moves with them, so no ridge or cloud bank jumps. Cloud patterns, the ridges' snow and growth patches, and the falling snow are all placed in the environment's own coordinates (`uShift`), so they move with it too. Before that was done, the cloud pattern changed at the first frame of the return (`docs/environment-realism/before-return-start.jpg`). In the thick snow of the middle of the return every environment layer fades fully into the sky, moves back to its own place while hidden, and comes out again with the opening landscape. At the lap boundary the environment is in the same place on both sides. Its drift runs on the ambient clock, which does not reset.
 
 Under reduced motion the layers are present and still.
 
