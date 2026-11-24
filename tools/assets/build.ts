@@ -294,6 +294,12 @@ forms.forEach((f, k) => {
 	for (let i = 0; i < f.length; i++) packed[k * PARTICLES * 3 + i] = Math.round(clamp(f[i] / 3, -1, 1) * 32767);
 });
 writeFileSync(`${OUT}/particles.bin`, Buffer.from(packed.buffer));
+// A phone draws the first PARTICLES_COARSE points of each form. They are written on their own as well,
+// so it does not fetch the rest. `COARSE_PARTICLES` in src/scene/explore.ts is the same number.
+const PARTICLES_COARSE = 9000;
+const packedCoarse = new Int16Array(PARTICLES_COARSE * 9);
+for (let k = 0; k < forms.length; k++) packedCoarse.set(packed.subarray(k * PARTICLES * 3, k * PARTICLES * 3 + PARTICLES_COARSE * 3), k * PARTICLES_COARSE * 3);
+writeFileSync(`${OUT}/particles-coarse.bin`, Buffer.from(packedCoarse.buffer));
 
 const report = {
 	blocks: blocks.length,
