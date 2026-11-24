@@ -1,0 +1,69 @@
+# 402x874, device pixel ratio 3, 3 interleaved runs, median of runs [range of frame]. Milliseconds. Display limit removed. Desktop GPU.
+
+## winter, opening
+asis                   frame 1.74 [1.57-1.84]  +0.00  gpu 2.05  script 2.20  calls 46  tris 507024  201x437
+off-terrain            frame 1.71 [1.51-1.74]  -0.04  gpu 1.07  script 2.00  calls 44  tris 163904  201x437
+off-landmark           frame 1.56 [1.52-1.79]  -0.18  gpu 1.47  script 2.10  calls 34  tris 364142  201x437
+off-ridges             frame 1.68 [1.53-1.88]  -0.07  gpu 1.96  script 2.20  calls 43  tris 486864  201x437
+off-clouds             frame 1.66 [1.57-1.80]  -0.09  gpu 1.93  script 2.30  calls 43  tris 506910  201x437
+off-banks              frame 1.64 [1.62-1.70]  -0.11  gpu 2.01  script 2.20  calls 46  tris 507024  201x437
+off-wood               frame 1.80 [1.68-1.91]  +0.06  gpu 1.97  script 2.30  calls 46  tris 507024  201x437
+off-foliage            frame 1.72 [1.65-1.75]  -0.03  gpu 2.01  script 2.20  calls 46  tris 507024  201x437
+off-mist               frame 1.69 [1.67-1.85]  -0.06  gpu 1.99  script 2.30  calls 41  tris 507014  201x437
+off-particles          frame 1.69 [1.64-1.74]  -0.06  gpu 1.95  script 2.20  calls 44  tris 507024  201x437
+off-shafts             frame 1.63 [1.61-1.87]  -0.11  gpu 2.01  script 2.20  calls 46  tris 507024  201x437
+off-exhibits           frame 1.66 [1.62-1.77]  -0.09  gpu 2.02  script 2.20  calls 46  tris 507024  201x437
+off-explore            frame 1.74 [1.62-1.80]  -0.00  gpu 2.13  script 2.10  calls 46  tris 507024  201x437
+off-passage            frame 1.73 [1.65-1.93]  -0.01  gpu 2.05  script 2.20  calls 46  tris 507024  201x437
+off-all                frame 1.54 [1.50-1.61]  -0.20  gpu 0.89  script 2.20  calls 19  tris 738  201x437
+
+## spring, engineering rest
+asis                   frame 1.78 [1.65-1.99]  +0.00  gpu 1.27  script 2.10  calls 74  tris 216722  201x437
+off-terrain            frame 1.83 [1.67-1.85]  +0.05  gpu 1.28  script 2.00  calls 74  tris 216722  201x437
+off-landmark           frame 1.72 [1.66-1.82]  -0.06  gpu 1.95  script 2.10  calls 74  tris 216722  201x437
+off-ridges             frame 1.70 [1.65-2.05]  -0.08  gpu 1.51  script 1.90  calls 71  tris 196562  201x437
+off-clouds             frame 1.68 [1.65-1.89]  -0.10  gpu 1.47  script 2.20  calls 71  tris 216608  201x437
+off-banks              frame 1.68 [1.67-1.78]  -0.11  gpu 1.44  script 2.20  calls 67  tris 155156  201x437
+off-wood               frame 1.71 [1.70-1.80]  -0.08  gpu 1.20  script 2.00  calls 67  tris 183552  201x437
+off-foliage            frame 1.71 [1.69-1.71]  -0.08  gpu 1.18  script 2.30  calls 66  tris 198344  201x437
+off-mist               frame 1.83 [1.72-1.87]  +0.04  gpu 1.60  script 2.20  calls 74  tris 216722  201x437
+off-particles          frame 1.75 [1.68-1.79]  -0.04  gpu 1.20  script 2.10  calls 72  tris 216722  201x437
+off-shafts             frame 1.76 [1.76-1.89]  -0.02  gpu 1.54  script 2.30  calls 73  tris 216710  201x437
+off-exhibits           frame 1.66 [1.64-1.74]  -0.13  gpu 0.89  script 2.10  calls 50  tris 134138  201x437
+off-explore            frame 1.79 [1.64-1.85]  +0.01  gpu 1.24  script 2.10  calls 74  tris 216722  201x437
+off-passage            frame 1.79 [1.71-1.96]  +0.00  gpu 1.23  script 2.10  calls 74  tris 216722  201x437
+off-all                frame 1.53 [1.51-1.61]  -0.25  gpu 0.89  script 1.10  calls 19  tris 738  201x437
+
+## ring passage
+asis                   frame 1.86 [1.66-1.96]  +0.00  gpu 1.32  script 2.20  calls 45  tris 361780  201x437
+off-terrain            frame 1.86 [1.62-1.86]  -0.00  gpu 1.34  script 2.10  calls 45  tris 361780  201x437
+off-landmark           frame 1.65 [1.60-1.79]  -0.22  gpu 1.84  script 2.20  calls 45  tris 361780  201x437
+off-ridges             frame 1.65 [1.60-1.96]  -0.21  gpu 1.41  script 2.00  calls 42  tris 341620  201x437
+off-clouds             frame 1.54 [1.52-1.73]  -0.32  gpu 1.46  script 0.50  calls 42  tris 361666  201x437
+off-banks              frame 1.74 [1.64-1.90]  -0.12  gpu 1.26  script 2.20  calls 40  tris 308376  201x437
+off-wood               frame 1.69 [1.66-1.71]  -0.17  gpu 1.33  script 0.50  calls 44  tris 354380  201x437
+off-foliage            frame 1.72 [1.70-1.72]  -0.14  gpu 1.28  script 0.40  calls 44  tris 360604  201x437
+off-mist               frame 1.70 [1.64-1.72]  -0.16  gpu 1.56  script 2.20  calls 45  tris 361780  201x437
+off-particles          frame 1.70 [1.61-1.88]  -0.16  gpu 1.32  script 2.20  calls 42  tris 361780  201x437
+off-shafts             frame 1.66 [1.64-1.84]  -0.20  gpu 1.37  script 2.20  calls 42  tris 361656  201x437
+off-exhibits           frame 1.72 [1.71-1.84]  -0.14  gpu 1.31  script 2.20  calls 45  tris 361780  201x437
+off-explore            frame 1.69 [1.54-1.72]  -0.17  gpu 1.29  script 0.50  calls 42  tris 287500  201x437
+off-passage            frame 1.65 [1.57-1.78]  -0.21  gpu 0.90  script 2.00  calls 41  tris 157396  201x437
+off-all                frame 1.56 [1.52-1.69]  -0.30  gpu 0.90  script 1.60  calls 19  tris 738  201x437
+
+## return, middle
+asis                   frame 2.14 [1.69-2.27]  +0.00  gpu 3.25  script 2.30  calls 83  tris 684496  201x437
+off-terrain            frame 1.84 [1.69-2.04]  -0.30  gpu 1.70  script 2.20  calls 81  tris 341376  201x437
+off-landmark           frame 1.74 [1.65-2.01]  -0.40  gpu 2.82  script 2.40  calls 71  tris 541614  201x437
+off-ridges             frame 1.92 [1.69-2.30]  -0.23  gpu 3.19  script 2.50  calls 80  tris 664336  201x437
+off-clouds             frame 1.82 [1.69-2.18]  -0.32  gpu 2.92  script 2.40  calls 80  tris 684382  201x437
+off-banks              frame 2.09 [1.80-2.09]  -0.06  gpu 2.60  script 2.50  calls 75  tris 603824  201x437
+off-wood               frame 1.98 [1.90-2.24]  -0.16  gpu 3.16  script 2.40  calls 69  tris 615010  201x437
+off-foliage            frame 1.84 [1.78-2.08]  -0.30  gpu 3.08  script 2.30  calls 69  tris 657182  201x437
+off-mist               frame 1.92 [1.91-2.03]  -0.22  gpu 3.17  script 2.30  calls 78  tris 684486  201x437
+off-particles          frame 1.88 [1.79-2.07]  -0.27  gpu 3.11  script 2.50  calls 80  tris 684496  201x437
+off-shafts             frame 1.88 [1.82-2.03]  -0.26  gpu 3.19  script 0.90  calls 83  tris 684496  201x437
+off-exhibits           frame 1.96 [1.76-2.19]  -0.19  gpu 3.25  script 2.50  calls 83  tris 684496  201x437
+off-explore            frame 2.08 [1.88-2.08]  -0.07  gpu 3.17  script 0.90  calls 83  tris 684496  201x437
+off-passage            frame 1.94 [1.84-2.09]  -0.20  gpu 2.84  script 1.30  calls 83  tris 684496  201x437
+off-all                frame 1.62 [1.60-1.66]  -0.52  gpu 0.90  script 1.70  calls 19  tris 738  201x437

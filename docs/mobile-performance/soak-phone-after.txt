@@ -1,0 +1,36 @@
+{
+ "minutes": 4,
+ "cycles": 12,
+ "frames": 15434,
+ "meanMs": 16.67,
+ "p50": "16.7",
+ "p95": "18.4",
+ "p99": "19.2",
+ "max": "25.3",
+ "over33ms": 0,
+ "slowAt": [],
+ "tier": [
+  "phone-1.5",
+  "phone-1.5"
+ ],
+ "governor": "steady",
+ "buffer": "603x1311",
+ "programs": [
+  51,
+  51
+ ],
+ "geometries": [
+  168,
+  168
+ ],
+ "textures": [
+  28,
+  28
+ ],
+ "heapMB": [
+  63,
+  37
+ ],
+ "rebases": 12,
+ "errors": []
+}

@@ -1,0 +1,58 @@
+# before and after, each configuration scaled by 3/1.75 so the GPU is the limit: 402x874 at 3x, touch emulation, 3 runs, median. Milliseconds. Display limit removed. Desktop GPU.
+# frame: mean animation-frame interval (CPU and GPU together). gpu: timer query over the frame. cpu: main thread in the frame callback.
+
+## winter, opening
+dpr=3@http://localhost:4174        frame  6.12         gpu 19.47         cpu  6.00  calls  46  tris 507024  1206x2622
+dpr=3&msaa=2                       frame  5.57  -0.54  gpu 17.95  -1.52  cpu  5.47  calls  43  tris 507021  1206x2622
+dpr=2.57&msaa=0                    frame  3.39  -2.73  gpu  9.51  -9.97  cpu  3.30  calls  43  tris 507021  1033x2246
+dpr=2.14&msaa=0                    frame  2.74  -3.37  gpu  5.14 -14.33  cpu  2.65  calls  43  tris 507021  860x1870
+dpr=1.71&msaa=0                    frame  2.04  -4.08  gpu  4.51 -14.96  cpu  1.95  calls  43  tris 507021  687x1494
+
+## spring, engineering builds
+dpr=3@http://localhost:4174        frame  4.36         gpu 13.46         cpu  4.22  calls  69  tris 373530  1206x2622
+dpr=3&msaa=2                       frame  3.15  -1.22  gpu  8.77  -4.69  cpu  1.10  calls  69  tris 209757  1206x2622
+dpr=2.57&msaa=0                    frame  2.11  -2.25  gpu  3.24 -10.22  cpu  2.01  calls  69  tris 209937  1033x2246
+dpr=2.14&msaa=0                    frame  1.71  -2.65  gpu  3.15 -10.31  cpu  1.61  calls  69  tris 209937  860x1870
+dpr=1.71&msaa=0                    frame  1.68  -2.68  gpu  2.77 -10.69  cpu  1.59  calls  69  tris 209937  687x1494
+
+## spring, engineering rest
+dpr=3@http://localhost:4174        frame  5.28         gpu 15.93         cpu  4.80  calls  70  tris 373882  1206x2622
+dpr=3&msaa=2                       frame  3.42  -1.86  gpu 10.30  -5.63  cpu  3.32  calls  71  tris 216719  1206x2622
+dpr=2.57&msaa=0                    frame  2.20  -3.08  gpu  4.50 -11.42  cpu  2.09  calls  71  tris 216899  1033x2246
+dpr=2.14&msaa=0                    frame  1.87  -3.41  gpu  3.03 -12.89  cpu  1.77  calls  71  tris 216899  860x1870
+dpr=1.71&msaa=0                    frame  1.69  -3.59  gpu  3.06 -12.87  cpu  1.60  calls  71  tris 216899  687x1494
+
+## summer, kensaku rest
+dpr=3@http://localhost:4174        frame  5.49         gpu 17.51         cpu  5.38  calls  64  tris 405954  1206x2622
+dpr=3&msaa=2                       frame  3.64  -1.86  gpu 10.78  -6.73  cpu  3.53  calls  54  tris 204789  1206x2622
+dpr=2.57&msaa=0                    frame  2.19  -3.31  gpu  4.46 -13.05  cpu  2.08  calls  54  tris 204969  1033x2246
+dpr=2.14&msaa=0                    frame  1.91  -3.59  gpu  2.67 -14.84  cpu  1.81  calls  54  tris 204969  860x1870
+dpr=1.71&msaa=0                    frame  1.64  -3.86  gpu  2.06 -15.45  cpu  1.55  calls  54  tris 204969  687x1494
+
+## ring passage
+dpr=3@http://localhost:4174        frame  5.82         gpu 18.33         cpu  5.65  calls  56  tris 570074  1206x2622
+dpr=3&msaa=2                       frame  4.85  -0.97  gpu 15.16  -3.16  cpu  4.70  calls  42  tris 361777  1206x2622
+dpr=2.57&msaa=0                    frame  2.78  -3.04  gpu  4.79 -13.53  cpu  2.65  calls  42  tris 361957  1033x2246
+dpr=2.14&msaa=0                    frame  2.07  -3.74  gpu  4.15 -14.17  cpu  1.96  calls  42  tris 361957  860x1870
+dpr=1.71&msaa=0                    frame  1.58  -4.24  gpu  3.15 -15.18  cpu  1.48  calls  42  tris 361957  687x1494
+
+## autumn, explore rest
+dpr=3@http://localhost:4174        frame  4.58         gpu 13.85         cpu  4.48  calls  49  tris 365566  1206x2622
+dpr=3&msaa=2                       frame  3.44  -1.15  gpu 10.13  -3.72  cpu  3.33  calls  34  tris 134285  1206x2622
+dpr=2.57&msaa=0                    frame  2.06  -2.52  gpu  3.79 -10.06  cpu  1.98  calls  35  tris 134477  1033x2246
+dpr=2.14&msaa=0                    frame  1.70  -2.89  gpu  2.44 -11.41  cpu  1.61  calls  35  tris 134477  860x1870
+dpr=1.71&msaa=0                    frame  1.59  -3.00  gpu  2.03 -11.82  cpu  1.50  calls  35  tris 134477  687x1494
+
+## return, dispersing
+dpr=3@http://localhost:4174        frame  4.38         gpu 13.78         cpu  4.24  calls  48  tris 365566  1206x2622
+dpr=3&msaa=2                       frame  3.01  -1.37  gpu  8.78  -5.00  cpu  2.90  calls  32  tris 129509  1206x2622
+dpr=2.57&msaa=0                    frame  1.93  -2.45  gpu  3.20 -10.58  cpu  1.83  calls  32  tris 129509  1033x2246
+dpr=2.14&msaa=0                    frame  1.54  -2.84  gpu  2.53 -11.26  cpu  1.44  calls  32  tris 129509  860x1870
+dpr=1.71&msaa=0                    frame  1.52  -2.86  gpu  2.49 -11.30  cpu  1.42  calls  32  tris 129509  687x1494
+
+## return, arriving
+dpr=3@http://localhost:4174        frame  7.50         gpu 24.40         cpu  7.40  calls  47  tris 507024  1206x2622
+dpr=3&msaa=2                       frame  5.97  -1.53  gpu 20.09  -4.31  cpu  5.85  calls  44  tris 507021  1206x2622
+dpr=2.57&msaa=0                    frame  3.51  -3.99  gpu 10.25 -14.15  cpu  3.41  calls  44  tris 507021  1033x2246
+dpr=2.14&msaa=0                    frame  2.83  -4.67  gpu  5.46 -18.95  cpu  2.71  calls  44  tris 507021  860x1870
+dpr=1.71&msaa=0                    frame  2.01  -5.49  gpu  4.50 -19.90  cpu  1.92  calls  44  tris 507021  687x1494

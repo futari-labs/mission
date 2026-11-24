@@ -1,0 +1,19 @@
+# after: 1440x900, desktop, 5 loads with an empty cache. Milliseconds, median [range]. Desktop CPU and GPU.
+scene first shown after                     280  [277-297]
+script in the first frame                    17  [17-20]
+frames over 34 ms until the entrance ends     0  [0-0]
+longest frame until the entrance ends        32  [23-33]
+time in frames over 34 ms                     0  [0-0]
+longest frame on first arrival at 0.3        19  [18-19]
+longest frame on first arrival at 0.43       19  [18-20]
+longest frame on first arrival at 0.67       19  [18-22]
+longest frame on first arrival at 0.8        19  [19-20]
+longest frame on first arrival at 1.02       19  [19-19]
+longest frame on first arrival at 1.19       20  [19-22]
+shader programs after the entrance           48  [48-48]
+slow frames of each load (frame number: interval):
+  none
+  none
+  none
+  none
+  none
