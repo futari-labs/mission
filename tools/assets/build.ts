@@ -1,9 +1,9 @@
 // Regenerates every runtime asset of the opening scene. Deterministic: same inputs, same bytes.
 // Run with: pnpm assets:build
 import { mkdirSync, statSync, writeFileSync } from 'node:fs';
-import { BLOCKS, type Block, SEAM, sdBlock, sdBlockCoarse, sdBridgeCoarse } from './bridge.ts';
 import { SHAPES, type Shape } from './exhibits.ts';
 import { type BakedMesh, writeGlb } from './glb.ts';
+import { BLOCKS, type Block, LIGHT, outline, sdBlock, sdBlockCoarse, sdLandmarkCoarse } from './landmark.ts';
 import { clamp, makeNoise, mulberry32, smooth } from './noise.ts';
 import { encodeGrayPng } from './png.ts';
 import { type Sdf, surfaceNets, type Vec3 } from './surfacenets.ts';
@@ -35,17 +35,18 @@ function occlusion(f: Sdf, p: Vec3, n: Vec3, reach: number): number {
 	return clamp(1 - (1.5 * occ) / total);
 }
 
-// Bridge bake channels: R occlusion when assembled, G occlusion of the block alone,
-// B edge wear (0.5 is flat, above is a convex edge), A per-block tint.
+// Landmark bake channels: R occlusion when assembled, G occlusion of the block alone,
+// B edge wear (0.5 is flat, above is a convex edge), A how much joint light this point shows.
 function bakeBlock(b: Block): BakedMesh {
 	const f: Sdf = (x, y, z) => sdBlock(b, x, y, z);
 	const m = 0.22;
-	const { positions, indices } = surfaceNets(f, [b.min[0] - m, b.min[1] - m, b.min[2] - m], [b.max[0] + m, b.max[1] + m, b.max[2] + m], 0.062);
+	const { positions, indices } = surfaceNets(f, [b.min[0] - m, b.min[1] - m, b.min[2] - m], [b.max[0] + m, b.max[1] + m, b.max[2] + m], 0.05);
 	const count = positions.length / 3;
 	const pos = new Float32Array(positions);
 	const normals = new Float32Array(count * 3);
 	const bake = new Uint8Array(count * 4);
-	const world: Sdf = (x, y, z) => Math.min(sdBridgeCoarse(x, y, z), y - terrainHeight(x, z));
+	const world: Sdf = (x, y, z) => Math.min(sdLandmarkCoarse(x, y, z), y - terrainHeight(x, z));
+	const others: Sdf = (x, y, z) => sdLandmarkCoarse(x, y, z, b);
 	const self: Sdf = (x, y, z) => sdBlockCoarse(b, x, y, z);
 	for (let i = 0; i < count; i++) {
 		let p: Vec3 = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
@@ -60,14 +61,15 @@ function bakeBlock(b: Block): BakedMesh {
 		bake[i * 4] = byte(occlusion(world, p, n, 0.55));
 		bake[i * 4 + 1] = byte(occlusion(self, p, n, 0.55));
 		bake[i * 4 + 2] = byte(0.5 + lap * 0.55);
-		bake[i * 4 + 3] = byte(b.tint);
+		// light shows only inside the joints a glowing block shares with its neighbours
+		bake[i * 4 + 3] = b.glow ? byte(1.6 * (1 - occlusion(others, p, n, 0.22))) : 0;
 	}
 	const idx = new Uint32Array(indices);
 	// surface nets does not guarantee winding, so orient every triangle by the field normal
 	orient(idx, pos, normals);
 	return {
 		name: b.name, positions: pos, normals, bake, indices: idx,
-		extras: { side: b.side, kind: b.kind, order: b.order, pivot: b.pivot, out: b.out, poly: b.poly.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]), z0: +b.min[2].toFixed(3), z1: +b.max[2].toFixed(3) },
+		extras: { side: b.side, order: b.order, mobility: b.mobility, pivot: b.pivot.map((v) => +v.toFixed(3)), out: b.out, outline: outline(b), z0: +b.min[2].toFixed(3), z1: +b.max[2].toFixed(3) },
 	};
 }
 
@@ -91,7 +93,7 @@ function bakeShape(shape: Shape): BakedMesh {
 		const e = 0.05;
 		const lap = (g(p[0] + e, p[1], p[2]) + g(p[0] - e, p[1], p[2]) + g(p[0], p[1] + e, p[2]) + g(p[0], p[1] - e, p[2]) + g(p[0], p[1], p[2] + e) + g(p[0], p[1], p[2] - e) - 6 * g(p[0], p[1], p[2])) / e;
 		const ao = occlusion(g, p, n, 0.4);
-		bake.set([byte(ao), byte(ao), byte(0.5 + lap * 0.55), 128], i * 4);
+		bake.set([byte(ao), byte(ao), byte(0.5 + lap * 0.55), 0], i * 4);
 	}
 	const idx = new Uint32Array(indices);
 	orient(idx, pos, normals);
@@ -109,7 +111,7 @@ function orient(idx: Uint32Array, pos: Float32Array, normals: Float32Array): voi
 }
 
 /** Points spread evenly over the surface of some meshes, moved and scaled into the particle volume. */
-function samplePoints(meshes: BakedMesh[], count: number, seed: number, center: Vec3, scale: number, keep: (y: number) => boolean = () => true): Float32Array {
+function samplePoints(meshes: BakedMesh[], count: number, seed: number, center: Vec3, scale: Vec3, keep: (y: number, nz: number) => boolean = () => true): Float32Array {
 	const rand = mulberry32(seed);
 	const tris: { m: BakedMesh; t: number; area: number }[] = [];
 	let total = 0;
@@ -117,10 +119,11 @@ function samplePoints(meshes: BakedMesh[], count: number, seed: number, center: 
 		for (let t = 0; t < m.indices.length; t += 3) {
 			const [a, b, c] = [m.indices[t] * 3, m.indices[t + 1] * 3, m.indices[t + 2] * 3];
 			const p = m.positions;
-			if (!keep((p[a + 1] + p[b + 1] + p[c + 1]) / 3)) continue;
 			const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2];
 			const vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
-			const area = 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+			const nzRaw = ux * vy - uy * vx;
+			const area = 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, nzRaw);
+			if (area === 0 || !keep((p[a + 1] + p[b + 1] + p[c + 1]) / 3, nzRaw / (2 * area))) continue;
 			total += area;
 			tris.push({ m, t, area: total });
 		}
@@ -139,12 +142,12 @@ function samplePoints(meshes: BakedMesh[], count: number, seed: number, center: 
 		let u = rand();
 		let v = rand();
 		if (u + v > 1) [u, v] = [1 - u, 1 - v];
-		for (let k = 0; k < 3; k++) out[i * 3 + k] = (m.positions[a + k] + u * (m.positions[b + k] - m.positions[a + k]) + v * (m.positions[c + k] - m.positions[a + k]) - center[k]) * scale;
+		for (let k = 0; k < 3; k++) out[i * 3 + k] = (m.positions[a + k] + u * (m.positions[b + k] - m.positions[a + k]) + v * (m.positions[c + k] - m.positions[a + k]) - center[k]) * scale[k];
 	}
 	return out;
 }
 
-// Terrain bake channels: R occlusion from the bridge, G snow cover, B cavity (0.5 is flat), A broad tint.
+// Terrain bake channels: R occlusion from the landmark, G snow cover, B cavity (0.5 is flat), A broad tint.
 function bakeTerrain(name: string, x0: number, x1: number, z0: number, z1: number, step: number, hole: [number, number, number, number] | null, withBridge: boolean): BakedMesh {
 	const nx = Math.round((x1 - x0) / step) + 1;
 	const nz = Math.round((z1 - z0) / step) + 1;
@@ -170,12 +173,12 @@ function bakeTerrain(name: string, x0: number, x1: number, z0: number, z1: numbe
 			const cavity = (terrainHeight(x + c, z) + terrainHeight(x - c, z) + terrainHeight(x, z + c) + terrainHeight(x, z - c) - 4 * s.h) / c;
 			const snow = smooth(0.5, 0.8, n[1] + 0.07 * N.n3(x * 0.4, 1.7, z * 0.4) + 0.05 * N.n3(x * 1.7, 3.1, z * 1.7)) * (1 - 0.6 * s.rocky * smooth(0.97, 0.78, n[1])) * (1 - 0.8 * s.scour * smooth(-0.05, 0.3, N.fbm(x * 0.33, 5.5, z * 0.33, 2)));
 			let ao = 1;
-			if (withBridge && Math.abs(x) < 12 && Math.abs(z) < 6) {
+			if (withBridge && Math.abs(x) < 11 && Math.abs(z) < 6) {
 				const p: Vec3 = [x, s.h + 0.02, z];
-				ao = occlusion((px, py, pz) => sdBridgeCoarse(px, py, pz), p, n, 1.4);
-				// the deck overhead blocks sky light: sample the bridge field above the ground
+				ao = occlusion((px, py, pz) => sdLandmarkCoarse(px, py, pz), p, n, 1.4);
+				// stone overhead blocks sky light: sample the landmark field above the ground
 				let over = 0;
-				for (let hgt = 1; hgt <= 6; hgt += 1) over = Math.max(over, smooth(1.3, 0.1, sdBridgeCoarse(x, s.h + hgt, z)));
+				for (let hgt = 1; hgt <= 6; hgt += 1) over = Math.max(over, smooth(1.3, 0.1, sdLandmarkCoarse(x, s.h + hgt, z)));
 				ao *= 1 - 0.42 * over;
 			}
 			bake.set([byte(ao), byte(snow), byte(0.5 - cavity * 0.9), byte(0.5 + 0.5 * N.fbm(x * 0.045, 6.6, z * 0.045, 2))], v * 4);
@@ -209,7 +212,7 @@ function detailTexture(size: number): Buffer {
 
 const t0 = Date.now();
 const blocks = BLOCKS.map(bakeBlock);
-await writeGlb(`${OUT}/bridge.glb`, blocks, { seam: SEAM });
+await writeGlb(`${OUT}/landmark.glb`, blocks, { light: LIGHT });
 const near: [number, number, number, number] = [-40, 36, -18, 54];
 await writeGlb(`${OUT}/terrain.glb`, [
 	bakeTerrain('near', near[0], near[1], near[2], near[3], 0.2, null, true),
@@ -223,9 +226,10 @@ await writeGlb(`${OUT}/exhibits.glb`, shapes);
 const PARTICLES = 24000;
 const shape = (name: string) => shapes.filter((m) => m.name === name);
 const forms = [
-	samplePoints(blocks, PARTICLES, 5, [0, 2.9, 0], 0.27, (y) => y > 0.1),
-	samplePoints(shape('engineering'), PARTICLES, 6, [0, -0.15, 0], 1.0),
-	samplePoints(shape('kensaku'), PARTICLES, 7, [0, -0.35, -0.2], 0.95),
+	// 二人 again: only the front and back faces, flattened in depth, so the strokes stay crisp at any particle count
+	samplePoints(blocks, PARTICLES, 5, [0, 2.75, 0], [0.285, 0.285, 0.13], (y, nz) => y > 0.05 && Math.abs(nz) > 0.7),
+	samplePoints(shape('engineering'), PARTICLES, 6, [0, -0.15, 0], [1, 1, 1]),
+	samplePoints(shape('kensaku'), PARTICLES, 7, [0, -0.35, -0.2], [0.95, 0.95, 0.95]),
 ];
 const packed = new Int16Array(PARTICLES * 9);
 forms.forEach((f, k) => {
@@ -236,8 +240,8 @@ writeFileSync(`${OUT}/particles.bin`, Buffer.from(packed.buffer));
 const tris = (m: BakedMesh[]) => m.reduce((s, x) => s + x.indices.length / 3, 0);
 const report = {
 	blocks: blocks.length,
-	bridgeTriangles: tris(blocks),
-	bridgeBytes: statSync(`${OUT}/bridge.glb`).size,
+	landmarkTriangles: tris(blocks),
+	landmarkBytes: statSync(`${OUT}/landmark.glb`).size,
 	terrainBytes: statSync(`${OUT}/terrain.glb`).size,
 	detailBytes: statSync(`${OUT}/stone-detail.png`).size,
 	exhibits: Object.fromEntries(shapes.map((m) => [m.name, m.indices.length / 3])),

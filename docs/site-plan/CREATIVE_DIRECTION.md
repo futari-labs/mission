@@ -1,5 +1,7 @@
 # Creative direction
 
+> The bridge centerpiece described below was replaced by the 二人 sculpture. See `docs/identity/README.md`. The palette, type, exhibits, and storyboard still apply.
+
 This document fixes the look, the copy, and the sequence of the Futari Labs site. The reference analysis in `REFERENCE_ANALYSIS.md` supplies the evidence for each choice.
 
 ## Identity

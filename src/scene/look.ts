@@ -9,15 +9,18 @@ export const look = {
 		rim: { color: '#bfd2ff', intensity: 0.85, position: [13, 9, -17] as const },
 		environment: 0.42,
 	},
-	seam: { color: '#eef4ff', core: 7.5, light: 130, pool: 16, halo: 0.5 },
+	seam: { color: '#eef4ff', core: 7.5, light: 62, pool: 4, halo: 0.5, joint: 0.75 },
+	/** How far each character slides aside when the camera passes between them, in metres. */
+	gate: { part: 0.8 },
 	bloom: { intensity: 0.75, threshold: 0.92, smoothing: 0.25, radius: 0.72 },
 	grain: 0.06,
 	vignette: { offset: 0.32, darkness: 0.42 },
 	camera: {
-		desktop: { position: [-10.5, 2.45, 31] as const, target: [0.3, 3.55, 0] as const, fov: 27 },
-		phone: { position: [-28, 4.6, 37.5] as const, target: [0.2, 6, 0] as const, fov: 41 },
-		introDesktop: { position: [-5, 17, 25] as const, target: [0, 2.6, 0] as const, fov: 27 },
-		introPhone: { position: [-13, 24, 30] as const, target: [0, 3.2, 0] as const, fov: 41 },
+		// close to head on: the characters must read before anything else
+		desktop: { position: [-7.4, 2.45, 31.5] as const, target: [0.2, 3.3, 0] as const, fov: 27 },
+		phone: { position: [-8, 4.2, 47] as const, target: [0, 5.6, 0] as const, fov: 41 },
+		introDesktop: { position: [-4, 16, 26] as const, target: [0, 2.6, 0] as const, fov: 27 },
+		introPhone: { position: [-6, 24, 38] as const, target: [0, 3.2, 0] as const, fov: 41 },
 		parallax: { x: 0.42, y: 0.22 },
 	},
 	pointer: { radius: 2.7, travel: 0.32, twist: 0.075, stiffness: 5.5 },

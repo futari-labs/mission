@@ -47,7 +47,7 @@ export function terrain(x: number, z: number): TerrainSample {
 	h += peaks;
 
 	// placed from the desktop hero camera: far end at the left edge of frame, near end low at bottom center
-	const fgSeg = segment(x, z, -16.2, 19.2, -3.4, 27.6);
+	const fgSeg = segment(x, z, -14.2, 20.4, -0.8, 27.4);
 	const fgShape = Math.exp(-((fgSeg.d / 3.1) ** 2));
 	const fgH = 4.9 * (0.55 + 0.45 * smooth(0, 0.2, fgSeg.t)) * (1 - 0.62 * smooth(0.4, 1, fgSeg.t));
 	const fg = fgH * fgShape * (0.72 + 0.5 * N.ridged(x * 0.15, 1.1, z * 0.15, 3));

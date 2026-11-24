@@ -131,14 +131,9 @@ a {
 }
 
 .wordmark svg {
-	width: 2.1rem;
+	width: 2.5rem;
 	height: auto;
 	fill: currentColor;
-}
-
-.wordmark-seam {
-	fill: #fff;
-	filter: drop-shadow(0 0 3px #fff);
 }
 
 .identity {

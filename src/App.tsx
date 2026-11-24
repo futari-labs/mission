@@ -1,4 +1,5 @@
 import { type CSSProperties, type FocusEvent, type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { mark } from './content/mark.ts';
 import { site } from './content/site.ts';
 import { CHAPTERS, type ChapterId, chapterAt, JOURNEY_SCREENS, scrollProgress, scrollToChapter } from './journey/chapters.ts';
 import type { Engine, EngineState } from './scene/Engine.ts';
@@ -166,10 +167,8 @@ export function App() {
 			<header className="mast">
 				<div className="brand">
 				<a className="wordmark" href="#lab" onClick={go('lab')} aria-label={`${site.wordmark}, back to the start`}>
-					<svg viewBox="0 0 34 14" aria-hidden="true">
-						<path d="M0 0h14.6v4.4H9.2L6.6 14H1.9l2.6-9.6H0z" />
-						<path d="M34 0H19.4v4.4h5.4l2.6 9.6h4.7l-2.6-9.6H34z" />
-						<rect className="wordmark-seam" x="16.3" y="0" width="1.4" height="4.4" />
+					<svg viewBox={mark.viewBox} aria-hidden="true">
+						<path d={mark.path} />
 					</svg>
 					<span>{site.wordmark}</span>
 				</a>

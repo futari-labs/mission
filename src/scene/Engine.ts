@@ -6,10 +6,10 @@ import * as THREE from 'three';
 import { CHAPTERS, type ChapterId, chapterAt, chapterOpacity, nearestChapter, scrollProgress } from '../journey/chapters.ts';
 import { Atmosphere } from './atmosphere.ts';
 import { Beam } from './beam.ts';
-import { Bridge } from './bridge.ts';
 import { type ExhibitSet, loadExhibits } from './exhibits.ts';
 import { Explore } from './explore.ts';
 import { emptyPose, emptyState, poseAt, STATION, stateAt } from './journey.ts';
+import { Landmark } from './landmark.ts';
 import { look } from './look.ts';
 import { loadDetailTexture, stoneUniforms } from './materials.ts';
 import { createSky, installFog } from './sky.ts';
@@ -43,7 +43,7 @@ export class Engine {
 	private readonly camera = new THREE.PerspectiveCamera(27, 1, 0.3, 1200);
 	private readonly fog = new THREE.FogExp2(look.fog.color, look.fog.density);
 	private readonly lab = new THREE.Group();
-	private readonly bridge = new Bridge();
+	private readonly landmark = new Landmark();
 	private readonly terrain = new Terrain();
 	private readonly atmosphere: Atmosphere;
 	private readonly beam: Beam;
@@ -187,14 +187,14 @@ export class Engine {
 
 	async load(): Promise<void> {
 		this.options.onState('loading');
-		// The later chapters load alongside the opening, so a visitor who reloads mid-journey does not wait for the bridge first.
+		// The later chapters load alongside the opening, so a visitor who reloads mid-journey does not wait for the landmark first.
 		const later = this.loadLater();
 		try {
-			const [detail] = await Promise.all([loadDetailTexture('/assets/stone-detail.png'), this.bridge.load(), this.terrain.load()]);
+			const [detail] = await Promise.all([loadDetailTexture('/assets/stone-detail.png'), this.landmark.load(), this.terrain.load()]);
 			if (this.disposed) return;
 			stoneUniforms.uDetail.value = detail;
-			this.lab.add(this.terrain.root, this.bridge.root, this.atmosphere.root);
-			this.scene.add(this.lab, this.beam.root, this.bridge.lights);
+			this.lab.add(this.terrain.root, this.landmark.root, this.atmosphere.root);
+			this.scene.add(this.lab, this.beam.root, this.landmark.lights);
 			this.loaded = true;
 			this.renderer.compile(this.scene, this.camera);
 			this.enter();
@@ -258,7 +258,7 @@ export class Engine {
 		tl.to(this.intro, { camera: 1, duration: d * 0.95, ease: 'power3.inOut' }, 0);
 		tl.to(this.atmosphere, { reveal: 1, duration: d * 0.5, ease: 'none' }, d * 0.4);
 		let last = 0;
-		for (const b of this.bridge.blocks) {
+		for (const b of this.landmark.blocks) {
 			const at = 0.25 + b.order * 0.115;
 			b.lines.visible = true;
 			tl.to(b.lines.material, { opacity: 0.85, duration: 0.3, ease: 'power1.out' }, Math.max(0, at - 0.25));
@@ -266,9 +266,9 @@ export class Engine {
 			tl.to(b.lines.material, { opacity: 0, duration: 0.5, ease: 'power1.in', onComplete: () => void (b.lines.visible = false) }, at + 0.7);
 			last = Math.max(last, at + 1.15);
 		}
-		// the seam lights when the last tips settle: a short flare, then the resting level
-		tl.to(this.bridge, { seamLevel: 1.9, duration: 0.22, ease: 'power2.out' }, last - 0.15);
-		tl.to(this.bridge, { seamLevel: 1, duration: 0.9, ease: 'power2.inOut' }, last + 0.07);
+		// the light between the characters comes on when the last stones settle: a short flare, then the resting level
+		tl.to(this.landmark, { lightLevel: 1.9, duration: 0.22, ease: 'power2.out' }, last - 0.15);
+		tl.to(this.landmark, { lightLevel: 1, duration: 0.9, ease: 'power2.inOut' }, last + 0.07);
 		tl.call(() => this.options.onState('entering'), [], 0);
 		// arriving mid-page, for a capture, or with reduced motion: no entrance to watch
 		if (this.options.still || this.options.reducedMotion || this.progress > 0.02) tl.progress(1);
@@ -344,7 +344,7 @@ export class Engine {
 		this.progress = calm || dt === 0 ? goal : this.progress + (goal - this.progress) * (1 - Math.exp(-dt * 5.5));
 		if (Math.abs(goal - this.progress) < 1e-5) this.progress = goal;
 		poseAt(this.progress, wide, reducedMotion, this.pose);
-		// between the phone and desktop framings, pull the opening back so the whole bridge stays in view
+		// between the phone and desktop framings, pull the opening back so both characters stay in view
 		if (this.progress <= 0.06) {
 			const fit = Math.max(1, 1.6 / Math.max(this.camera.aspect, 0.72)) ** (0.55 * wide);
 			this.pose.position.sub(this.pose.target).multiplyScalar(fit).add(this.pose.target);
@@ -399,13 +399,13 @@ export class Engine {
 		const s = this.state;
 		this.fog.density = s.fogDensity + (look.fog.introDensity - s.fogDensity) * this.intro.fog;
 		this.lab.visible = s.lab;
-		this.bridge.gate = s.gate;
+		this.landmark.gate = s.gate;
 		if (s.lab) {
 			// the shadow map redraws only on frames where a block has moved
-			this.renderer.shadowMap.needsUpdate = this.bridge.update(dt, s.gate > 0.01 ? null : ray, time) || !settled;
+			this.renderer.shadowMap.needsUpdate = this.landmark.update(dt, s.gate > 0.01 ? null : ray, time) || !settled;
 			this.atmosphere.update(time);
-		} else this.bridge.dark();
-		this.beam.update(s.beam * this.bridge.seamLevel, time);
+		} else this.landmark.dark();
+		this.beam.update(s.beam * this.landmark.lightLevel, time);
 		const pointer = follow ? this.pointer : null;
 		if (this.exhibits) {
 			this.exhibits.engineering.visible = s.engineering;
@@ -428,7 +428,7 @@ export class Engine {
 		this.timeline?.kill();
 		gsap.killTweensOf(this.dim);
 		for (const fn of this.cleanup) fn();
-		this.bridge.dispose();
+		this.landmark.dispose();
 		this.terrain.dispose();
 		this.atmosphere.dispose();
 		this.beam.dispose();

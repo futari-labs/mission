@@ -1,0 +1,6 @@
+entrance                   {"frames":491,"mean":7.2,"p50":6.9,"p95":7.9,"p99":8.5,"max":115.5,"over33ms":1,"calls":39,"triangles":486750}
+loading                    [{"name":"Engine-69Z1p4XM.js","kb":218,"ms":83},{"name":"exhibits.glb","kb":1827,"ms":157},{"name":"landmark.glb","kb":930,"ms":154},{"name":"stone-detail.png","kb":175,"ms":150},{"name":"terrain.glb","kb":1896,"ms":157},{"name":"particles.bin","kb":422,"ms":210}]
+rest, 3 s                  {"frames":432,"mean":7,"p50":6.9,"p95":7.5,"p99":8.3,"max":8.7,"over33ms":0,"calls":39,"triangles":486750}
+pointer sweeps             {"frames":243,"mean":7.1,"p50":6.9,"p95":7.7,"p99":8.6,"max":41.7,"over33ms":1,"calls":49,"triangles":629622}
+journey forward            {"frames":2300,"mean":6.9,"p50":6.9,"p95":8.3,"p99":8.7,"max":10.8,"over33ms":0,"calls":24,"triangles":75018}
+journey reverse            {"frames":2312,"mean":6.9,"p50":6.9,"p95":8.4,"p99":8.7,"max":9.3,"over33ms":0,"calls":39,"triangles":486750}

@@ -1,13 +1,13 @@
 # Journey: sequence and transitions
 
-One light connects the four chapters. The seam between the bridge halves extends into a beam that runs
-straight back through the scene. Each exhibit sits on that beam, and the beam ends in the particle
+One light connects the four chapters. A shard of light hangs between the two characters of the 二人
+landmark and extends into a beam that runs straight back through the scene. Each exhibit sits on that beam, and the beam ends in the particle
 installation.
 
 ## One progress value
 
 `progress` is `scrollY / (scrollHeight - innerHeight)`, read every frame and damped. Everything else is
-a pure function of it: the camera pose, the opening of the bridge tips, fog density, which groups render,
+a pure function of it: the camera pose, the parting of the two characters, fog density, which groups render,
 the transition effect, and which chapter's HTML shows. Nothing listens for wheel events, so reversing,
 jumping, reloading mid-page, and resizing all resolve to the same state. Pointer parallax and ambient
 motion are added on top of the base pose and never write to it.
@@ -20,7 +20,7 @@ job with no second source of truth.
 | Progress | What happens |
 | --- | --- |
 | 0.00 to 0.06 | The lab at rest. |
-| 0.06 to 0.31 | One continuous camera move: toward the seam, through the gap, along the beam to Exhibit 01. The tip blocks part as the camera nears. The beam extends ahead. A frost front rises with block displacement and a color fringe, the view whites out inside the light, and clears into fog. |
+| 0.06 to 0.31 | One continuous camera move: toward the light, between 二 and 人, along the beam to Exhibit 01. Each character slides aside as a whole as the camera nears. The beam extends ahead. A frost front rises with block displacement and a color fringe, the view whites out inside the light, and clears into fog. |
 | 0.31 to 0.42 | Futari Engineering at rest. |
 | 0.42 to 0.53 | The camera passes beside the first enclosure and follows the beam to Kensaku. A lighter frost pass marks the midpoint. |
 | 0.53 to 0.65 | Kensaku at rest. |
@@ -48,7 +48,7 @@ Three rules came out of measurement and should be kept.
 - Chapter copy fades by scroll progress, set as an inline opacity on a permanent layer. The chapter links
   switch with no transition. CSS transitions on either dropped a frame at every chapter boundary.
 
-The bridge shadow map redraws only on frames where a block has moved.
+The landmark's shadow map redraws only on frames where a block has moved.
 
 ## Checks
 

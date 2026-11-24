@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import { CHAPTERS, nearestChapter } from '../journey/chapters.ts';
 import { look } from './look.ts';
 
-export const BEAM_Y = 5.43;
+/** Height of the guiding light. It starts between the two characters of the landmark. */
+export const BEAM_Y = 3.15;
 export const STATION = {
 	engineering: new THREE.Vector3(0, BEAM_Y, -60),
 	kensaku: new THREE.Vector3(0, BEAM_Y, -110),
@@ -18,7 +19,7 @@ export interface Pose {
 }
 
 export interface JourneyState {
-	/** 0 closed, 1 fully parted: the bridge tips opening for the camera. */
+	/** 0 closed, 1 fully parted: the two characters making room for the camera. */
 	gate: number;
 	/** How far the beam has extended from the seam, 0 to 1. */
 	beam: number;
@@ -80,10 +81,10 @@ function buildPaths(f: Framing): Paths {
 	const curve = (...pts: THREE.Vector3[]) => new THREE.CatmullRomCurve3(pts, false, 'centripetal');
 	return {
 		framing: f,
-		// toward the seam, through the gap, and along the beam, as one move
+		// toward the light, between the two characters, and along the beam, as one move
 		toEngineering: [
-			curve(f.hero[0], v(-4.6, 4.3, 17), v(-0.6, BEAM_Y - 0.1, 6), v(0, BEAM_Y, -5), v(-1.4, BEAM_Y + 0.3, -32), f.engineering[0]),
-			curve(f.hero[1], v(0, 5.1, -6), v(0, BEAM_Y, -24), v(0, BEAM_Y, -42), v(0.2, BEAM_Y - 0.1, -57), f.engineering[1]),
+			curve(f.hero[0], v(-3.2, 2.9, 17), v(-0.3, BEAM_Y - 0.05, 6), v(0, BEAM_Y, -5), v(-1.4, BEAM_Y + 0.3, -32), f.engineering[0]),
+			curve(f.hero[1], v(0, BEAM_Y - 0.1, -6), v(0, BEAM_Y, -24), v(0, BEAM_Y, -42), v(0.2, BEAM_Y - 0.1, -57), f.engineering[1]),
 		],
 		// past the first enclosure on its near side, then on to the next
 		toKensaku: [

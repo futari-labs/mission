@@ -1,17 +1,22 @@
-// The landmark at runtime: one group per stone block, the seam of light, the construction
-// lines used by the entrance, and the pointer response.
+// The 二人 landmark at runtime: one group per stone block, the light between the two characters,
+// the construction lines used by the entrance, the pointer response, and the parting of the two
+// characters when the camera passes between them.
 import * as THREE from 'three';
 import { loadGlb, meshesOf } from './assets.ts';
 import { look } from './look.ts';
 import { adoptBake, createStoneMaterial, stoneUniforms } from './materials.ts';
 
+/** What the asset build writes on every block. See bakeBlock in tools/assets/build.ts. */
 interface BlockExtras {
+	/** -1 for 二, 1 for 人. Each character parts as a whole, so its shape never breaks. */
 	side: -1 | 1;
-	kind: 'plinth' | 'pier' | 'table' | 'front' | 'back';
 	order: number;
+	/** 0 stays put under the pointer, 1 moves freely. */
+	mobility: number;
 	pivot: [number, number, number];
 	out: [number, number, number];
-	poly: [number, number][];
+	/** Outline of the block as flat line segments in x and y. */
+	outline: number[];
 	z0: number;
 	z1: number;
 }
@@ -31,13 +36,9 @@ export interface BlockRig {
 	introAngle: number;
 	loosen: number;
 	twistAxis: THREE.Vector3;
-	/** How much this block parts when the camera passes through the seam. Only the arm tips move. */
-	gate: number;
 }
 
-const MOBILITY: Record<BlockExtras['kind'], number> = { plinth: 0, pier: 0.25, table: 0.5, front: 1, back: 0.8 };
-
-export class Bridge {
+export class Landmark {
 	readonly root = new THREE.Group();
 	/**
 	 * Lights live outside the group that gets hidden. The number of lights in the scene must never
@@ -45,13 +46,15 @@ export class Bridge {
 	 */
 	readonly lights = new THREE.Group();
 	readonly blocks: BlockRig[] = [];
-	readonly seamPosition = new THREE.Vector3();
+	/** Where the guiding light starts, between the two characters. */
+	readonly origin = new THREE.Vector3();
 	/** 0 is dark, 1 is the resting brightness. The entrance and the pointer both drive it. */
-	seamLevel = 0;
-	/** 0 closed, 1 parted. Set from scroll progress: the arm tips open for the camera. */
+	lightLevel = 0;
+	/** 0 closed, 1 parted. Set from scroll progress: the two characters make room for the camera. */
 	gate = 0;
-	private seamBoost = 0;
-	private core!: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>;
+	private boost = 0;
+	private lastMotion = -1;
+	private core!: THREE.Mesh<THREE.OctahedronGeometry, THREE.MeshBasicMaterial>;
 	private halo!: THREE.Sprite;
 	private light!: THREE.PointLight;
 	private pool!: THREE.PointLight;
@@ -61,8 +64,8 @@ export class Bridge {
 	private readonly quat2 = new THREE.Quaternion();
 
 	async load(): Promise<void> {
-		const gltf = await loadGlb('/assets/bridge.glb');
-		const material = createStoneMaterial('bridge');
+		const gltf = await loadGlb('/assets/landmark.glb');
+		const material = createStoneMaterial('landmark');
 		const seed = (i: number) => Math.abs(Math.sin(i * 127.1 + 311.7) * 43758.5453) % 1;
 		for (const mesh of meshesOf(gltf.scene)) {
 			const extras = mesh.userData as BlockExtras;
@@ -76,7 +79,6 @@ export class Bridge {
 			mesh.position.sub(home);
 			group.add(mesh);
 			const i = this.blocks.length;
-			const height = 5 + extras.order * 0.9 + seed(i) * 2.5;
 			const lines = constructionLines(extras);
 			this.blocks.push({
 				group,
@@ -85,44 +87,39 @@ export class Bridge {
 				out: new THREE.Vector3(...extras.out).normalize(),
 				order: extras.order,
 				side: extras.side,
-				mobility: MOBILITY[extras.kind],
+				mobility: extras.mobility,
 				build: 0,
-				introOffset: new THREE.Vector3(extras.side * (1.2 + seed(i + 7) * 1.6), height, (seed(i + 3) - 0.5) * 3),
+				introOffset: new THREE.Vector3(extras.side * (0.6 + seed(i + 7) * 1.4), 5.5 + extras.order * 1.3 + seed(i) * 2, (seed(i + 3) - 0.5) * 3.2),
 				introAxis: new THREE.Vector3(seed(i + 11) - 0.5, seed(i + 13) - 0.5, seed(i + 17) - 0.5).normalize(),
-				introAngle: (seed(i + 19) - 0.5) * 1.1,
+				introAngle: (seed(i + 19) - 0.5) * 0.9,
 				loosen: 0,
 				twistAxis: new THREE.Vector3(seed(i + 23) - 0.5, seed(i + 29) - 0.5, seed(i + 31) - 0.5).normalize(),
-				gate: extras.kind === 'front' ? THREE.MathUtils.smoothstep(4.2 - Math.abs(home.x), 0.4, 3.9) : 0,
 			});
 			this.root.add(group, lines);
 		}
-		const seam = gltf.scene.userData.seam as { gap: number; yMin: number; yMax: number; depth: number };
-		this.buildSeam(seam);
+		const light = gltf.scene.userData.light as { x: number; y: number; z: number };
+		this.origin.set(light.x, light.y, light.z);
+		this.buildLight();
 	}
 
-	private buildSeam(seam: { gap: number; yMin: number; yMax: number; depth: number }): void {
-		const h = seam.yMax - seam.yMin;
-		this.seamPosition.set(0, seam.yMin + h / 2, 0);
-		this.core = new THREE.Mesh(
-			new THREE.BoxGeometry(seam.gap * 0.34, h * 0.9, seam.depth * 0.74),
-			new THREE.MeshBasicMaterial({ color: look.seam.color, fog: false }),
-		);
-		this.core.position.copy(this.seamPosition);
+	private buildLight(): void {
+		// a small shard of light that hangs between the characters, not a third stroke
+		this.core = new THREE.Mesh(new THREE.OctahedronGeometry(0.2, 0), new THREE.MeshBasicMaterial({ color: look.seam.color, fog: false }));
+		this.core.scale.set(0.55, 1.7, 0.55);
+		this.core.position.copy(this.origin);
 		this.halo = new THREE.Sprite(
 			new THREE.SpriteMaterial({ map: haloTexture(), color: look.seam.color, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, transparent: true }),
 		);
-		this.halo.position.copy(this.seamPosition);
-		this.halo.scale.set(4.6, 4.6, 1);
-		this.light = new THREE.PointLight(look.seam.color, 0, 16, 2);
-		this.light.position.copy(this.seamPosition).add(new THREE.Vector3(0, -0.1, 0.5));
-		this.pool = new THREE.PointLight(look.seam.color, 0, 11, 2);
-		this.pool.position.set(0, 3, 0.6);
+		this.halo.position.copy(this.origin);
+		this.halo.scale.set(4.4, 4.4, 1);
+		this.light = new THREE.PointLight(look.seam.color, 0, 15, 2);
+		this.light.position.copy(this.origin).add(new THREE.Vector3(0, 0.1, 0.4));
+		this.pool = new THREE.PointLight(look.seam.color, 0, 9, 2);
+		this.pool.position.set(this.origin.x, 2, 0.6);
 		this.touch = new THREE.PointLight(look.seam.color, 0, 7, 2);
 		this.root.add(this.core, this.halo);
 		this.lights.add(this.light, this.pool, this.touch);
 	}
-
-	private lastMotion = -1;
 
 	/**
 	 * Advances block poses. `ray` is the pointer ray in world space, or null when the pointer is away.
@@ -131,7 +128,7 @@ export class Bridge {
 	update(dt: number, ray: THREE.Ray | null, time: number): boolean {
 		const k = 1 - Math.exp(-dt * look.pointer.stiffness);
 		let maxLoosen = 0;
-		let nearSeam = 0;
+		let near = 0;
 		let motion = this.gate;
 		for (const b of this.blocks) {
 			let target = 0;
@@ -144,10 +141,10 @@ export class Bridge {
 			motion += b.loosen + b.build;
 			const settle = 1 - b.build;
 			this.tmp.copy(b.introOffset).multiplyScalar(settle).addScaledVector(b.out, b.loosen * look.pointer.travel);
-			this.tmp.x += b.side * this.gate * b.gate * 1.5;
-			this.tmp.y += this.gate * b.gate * 0.35;
-			// a slow breath so the assembled bridge is never frozen
-			this.tmp.y += Math.sin(time * 0.5 + b.order * 0.9 + b.side) * 0.004 * b.mobility;
+			// the whole character slides aside, so 二 and 人 keep their shapes while the camera passes
+			this.tmp.x += b.side * this.gate * look.gate.part;
+			// a slow breath so the standing stones are never frozen
+			this.tmp.y += Math.sin(time * 0.5 + b.order * 0.9 + b.side) * 0.005 * b.mobility;
 			b.group.position.copy(b.home).add(this.tmp);
 			this.quat.setFromAxisAngle(b.introAxis, b.introAngle * settle);
 			this.quat2.setFromAxisAngle(b.twistAxis, b.loosen * look.pointer.twist);
@@ -155,21 +152,22 @@ export class Bridge {
 			b.group.visible = b.build > 0.001;
 		}
 		if (ray) {
-			const d = Math.sqrt(ray.distanceSqToPoint(this.seamPosition));
-			nearSeam = THREE.MathUtils.smoothstep(4.5 - d, 0, 4);
-			ray.closestPointToPoint(this.seamPosition, this.tmp);
-			this.touch.position.set(THREE.MathUtils.clamp(this.tmp.x, -7, 7), THREE.MathUtils.clamp(this.tmp.y, 1, 6.5), 2.4);
+			const d = Math.sqrt(ray.distanceSqToPoint(this.origin));
+			near = THREE.MathUtils.smoothstep(4.5 - d, 0, 4);
+			ray.closestPointToPoint(this.origin, this.tmp);
+			this.touch.position.set(THREE.MathUtils.clamp(this.tmp.x, -7, 7), THREE.MathUtils.clamp(this.tmp.y, 0.8, 6.2), 2.2);
 		}
-		this.seamBoost += (nearSeam - this.seamBoost) * k;
+		this.boost += (near - this.boost) * k;
 		stoneUniforms.uLoosen.value = maxLoosen;
-		const level = this.seamLevel * (1 + 0.55 * this.seamBoost + 0.8 * this.gate) * (0.97 + 0.03 * Math.sin(time * 1.7));
+		const level = this.lightLevel * (1 + 0.55 * this.boost + 0.8 * this.gate) * (0.97 + 0.03 * Math.sin(time * 1.7));
+		stoneUniforms.uJoint.value = look.seam.joint * this.lightLevel * (1 + 1.4 * maxLoosen + 0.6 * this.boost);
 		this.core.material.color.set(look.seam.color).multiplyScalar(look.seam.core * level);
 		this.core.visible = level > 0.01;
-		this.core.scale.set(1 + this.gate * 4, 1, 1);
+		this.core.rotation.y = time * 0.4;
 		this.halo.material.opacity = look.seam.halo * Math.min(level, 1.6);
 		this.light.intensity = look.seam.light * level;
 		this.pool.intensity = look.seam.pool * level;
-		this.touch.intensity = 26 * maxLoosen * this.seamLevel;
+		this.touch.intensity = 26 * maxLoosen * this.lightLevel;
 		const moved = Math.abs(motion - this.lastMotion) > 1e-4;
 		this.lastMotion = motion;
 		return moved;
@@ -193,19 +191,15 @@ export class Bridge {
 	}
 }
 
-/** The outline of one block at its final place: both faces and the edges between them. */
+/** The outline of one block at its final place: both faces, and edges between them at the corners. */
 function constructionLines(extras: BlockExtras): BlockRig['lines'] {
 	const pts: number[] = [];
-	const corners = extras.poly.filter((p, i, all) => {
-		const a = all[(i + all.length - 1) % all.length];
-		const b = all[(i + 1) % all.length];
-		const cross = (p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0]);
-		return Math.abs(cross) > 0.02;
-	});
-	corners.forEach((p, i) => {
-		const q = corners[(i + 1) % corners.length];
-		pts.push(p[0], p[1], extras.z0, q[0], q[1], extras.z0, p[0], p[1], extras.z1, q[0], q[1], extras.z1, p[0], p[1], extras.z0, p[0], p[1], extras.z1);
-	});
+	const o = extras.outline;
+	for (let i = 0; i < o.length; i += 4) {
+		pts.push(o[i], o[i + 1], extras.z0, o[i + 2], o[i + 3], extras.z0, o[i], o[i + 1], extras.z1, o[i + 2], o[i + 3], extras.z1);
+		// a cross edge every few segments is enough to read the depth
+		if ((i / 4) % 7 === 0) pts.push(o[i], o[i + 1], extras.z0, o[i], o[i + 1], extras.z1);
+	}
 	const geometry = new THREE.BufferGeometry();
 	geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
 	const material = new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, fog: false, depthWrite: false, blending: THREE.AdditiveBlending });

@@ -57,7 +57,7 @@ export interface ExhibitSet {
 
 export async function loadExhibits(): Promise<ExhibitSet> {
 	const gltf = await loadGlb('/assets/exhibits.glb');
-	const stone = createStoneMaterial('bridge');
+	const stone = createStoneMaterial('landmark');
 	const { shell: s } = look.exhibit;
 	const crystal = new THREE.MeshPhysicalMaterial({
 		color: s.color,
