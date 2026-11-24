@@ -10,7 +10,7 @@
 // environment. Surface patterns are placed in the environment's own coordinates, so they stay
 // attached to the ground when the return moves the world.
 import * as THREE from 'three';
-import { loadGlb, meshesOf } from './assets.ts';
+import { loadGlb, loadPixels, meshesOf } from './assets.ts';
 import { tag } from './experiment.ts';
 import { look } from './look.ts';
 import { SKY_GLSL } from './sky.ts';
@@ -49,18 +49,15 @@ const CUT = { coverage: 0.04, single: 0.5 } as const;
 
 /** Cuts a tall image of square layers into a texture array, so each layer tiles and mipmaps on its own. */
 async function loadLayers(url: string, colour: boolean): Promise<{ texture: THREE.DataArrayTexture; mean: THREE.Vector3[] }> {
-	const image = await new THREE.ImageLoader().loadAsync(url);
-	const size = image.width;
-	const canvas = document.createElement('canvas');
-	canvas.width = size;
-	canvas.height = size * LAYERS;
-	const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-	ctx.drawImage(image, 0, 0);
-	const data = new Uint8Array(ctx.getImageData(0, 0, size, size * LAYERS).data.buffer);
+	const pixels = await loadPixels(url);
+	const size = pixels.width;
+	const data = new Uint8Array(pixels.data.buffer);
 	// the mean colour of each layer, in linear light: the shaders keep a photograph's detail and replace its average
+	// a byte has 256 values, so the curve is worked out once for each and not once for every sample
+	const linear = Float64Array.from({ length: 256 }, (_, v) => (v / 255) ** 2.2);
 	const mean = Array.from({ length: LAYERS }, (_, l) => {
 		const sum = [0, 0, 0];
-		for (let i = l * size * size * 4; i < (l + 1) * size * size * 4; i += 64) for (let c = 0; c < 3; c++) sum[c] += (data[i + c] / 255) ** 2.2;
+		for (let i = l * size * size * 4; i < (l + 1) * size * size * 4; i += 64) for (let c = 0; c < 3; c++) sum[c] += linear[data[i + c]];
 		return new THREE.Vector3(...sum).multiplyScalar(16 / (size * size));
 	});
 	const texture = new THREE.DataArrayTexture(data, size, size, LAYERS);

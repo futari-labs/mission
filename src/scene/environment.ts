@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { experiment, tag } from './experiment.ts';
 import { look } from './look.ts';
+import { valueNoise } from './noise.ts';
 import { SKY_GLSL } from './sky.ts';
 import { Grove } from './vegetation.ts';
 
@@ -92,30 +93,7 @@ function ridgeGeometry(layer: number): THREE.BufferGeometry {
 }
 
 function cloudTexture(size: number): THREE.DataTexture {
-	let s = 20260;
-	const rand = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
-	const grid = 8;
-	const lattice = Array.from({ length: 5 }, (_, o) => Float32Array.from({ length: (grid << o) ** 2 }, rand));
-	const data = new Uint8Array(size * size);
-	for (let y = 0; y < size; y++)
-		for (let x = 0; x < size; x++) {
-			let v = 0;
-			let amp = 0.5;
-			for (let o = 0; o < 5; o++) {
-				const n = grid << o;
-				const fx = (x / size) * n;
-				const fy = (y / size) * n;
-				const x0 = Math.floor(fx);
-				const y0 = Math.floor(fy);
-				const sx = (fx - x0) ** 2 * (3 - 2 * (fx - x0));
-				const sy = (fy - y0) ** 2 * (3 - 2 * (fy - y0));
-				const at = (i: number, j: number) => lattice[o][(j % n) * n + (i % n)];
-				v += amp * ((at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx) * (1 - sy) + (at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx) * sy);
-				amp *= 0.5;
-			}
-			data[y * size + x] = Math.round(v * 255);
-		}
-	const t = new THREE.DataTexture(data, size, size, THREE.RedFormat);
+	const t = new THREE.DataTexture(valueNoise(size, 8, 5, 20260), size, size, THREE.RedFormat);
 	t.wrapS = t.wrapT = THREE.RepeatWrapping;
 	t.minFilter = THREE.LinearMipmapLinearFilter;
 	t.magFilter = THREE.LinearFilter;
